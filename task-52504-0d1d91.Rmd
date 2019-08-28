@@ -50,7 +50,7 @@ plot(airmiles)
 Воспроизводимые исследования предполагают, что все процессы, которые разработчик проводил во время своей деятельности, можно повторить также, как это делал он. Это касается и 
 __генерации псевдослучайных чисел__.
 ```{r}
-set.seed(1)# делаем наш документ воспроизводимым
+set.seed(1) # делаем наш документ воспроизводимым
 sample(1:10,5)
 ```
 
@@ -119,8 +119,8 @@ _[Debian/Ubuntu:] sudo apt-get install git-core._
 
 После установки введите в **GIT Bash** следующую информацию:
 
-* git config –global user.name “your GitHub account name”                                 
-* git config –global user.email “GitHubEmail@something.com”
+* git config –-global user.name “your GitHub account name”                                 
+* git config –-global user.email “GitHubEmail@something.com”
 
 
 1. Заходим в Tools > Options > Git/SVN
