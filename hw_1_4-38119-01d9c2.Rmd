@@ -1,0 +1,123 @@
+---
+title: "hw_1_4"
+author: "Andrej Pawluczenko"
+date: "15.08.2019"
+output: html_document
+---
+
+1. Создайте функцию, если аргумент датафрейм, то на экране будет выводиться название столбцов и класс данных в столбцах (напр. Variable1 is Numeric)
+
+```{r}
+describe_df <- function(data) {
+  if (!is.data.frame(data)) stop('Input should be of class data.frame')
+  description_matrix <- vapply(
+    1:ncol(data),
+    function(i) c(names(data)[[i]], class(data[[i]])),
+    character(2)
+  )
+  description_string <- apply(
+    description_matrix,
+    2,
+    function(x) sprintf('%s is %s', x[1], x[2])
+  )
+  return(description_string)
+}
+# describe_df(1:11) выдает ошибку
+set.seed(111)
+df <- data.frame(
+  w = sample(1L:20L, 20, replace = TRUE),
+  x = runif(20, min = 3, max = 11),
+  y = factor(sample(LETTERS[1:4], 20, replace = TRUE)),
+  z = as.character(
+    replicate(20, paste(sample(letters, size = sample(3:6, 1)), collapse = ''))
+  ),
+  stringsAsFactors = FALSE
+)
+str(df)
+describe_df(df)
+describe_df(mtcars)
+```
+
+2. Напишите функцию, симулирующую работу «магического шара предсказаний». Подумайте, как параметризовать эту функцию. Напишите документацию, поясняющую ее использование.
+
+```{r}
+tell_fortune <- function(
+  question = readline(prompt = 'Спросите у магического шара: '),
+  method = 'kierkegaard'
+) {
+  # Currently the only available method is Kierkegaard
+  # More methods to be implemented soon
+  if (method != 'kierkegaard') method <- 'kierkegaard' # Temporary fix
+  if (method == 'kierkegaard') {
+    que <- strsplit(question, split = ' ')[[1]]
+    que <- gsub('\\?', '', que[length(que)])
+    cat(sprintf('%s — не %s, все равно будешь об этом жалеть.\n', que, que))
+    # Кстати, истинное авторство фразы не установлено.
+  }
+}
+
+tell_fortune("В чем смысл жизни?")
+tell_fortune("Стоит ли мне переехать в Калининград?")
+```
+
+Функция `tell_fortune()` призвана симулировать работу «магического шара предсказаний» или оракула, т. е. выдавать осмысленные ответы на вопросы пользователя. Аргумент `method` позволяет выбрать метод генерации предсказаний, однако на данный момент доступен только один вариант.
+
+`tell_fortune <- function(question = readline(prompt = 'Спросите у магического шара: '), method = 'kierkegaard')`
+
+`question` Строка, содержащая предположительно осмысленный вопрос, информации в котором достаточно информации для интерпретации оракулом. В идеале вопрос должен подразумевать однозначный положительный или отрицательный ответ.
+
+`method` Строка, определяющая метод генерации предсказаний. В настоящий момент доступен только метод Kierkegaard, дающий универсальный осмысленный ответ на любой вопрос. В дальнейших версиях функции предполагается добавление новых более сложных методов.
+
+3. Напишите функцию, считывающую введенное с клавиатуры число и выводящую сообщения, является это число четным или нечетным. Попробуйте подавать на вход функции не числа. Доработайте функцию таким образом, чтобы она корректно завершала работу (без error-а) при передаче неправильного аргумента. Напишите документацию (аналогично предыдущему пункту).
+
+```{r}
+is.even <- function(x = readline(prompt = 'Введите число: '), msg = TRUE) {
+  # Если на входе выражение в кавычках
+  if (substr(x, 1, 1) == '"') x <- gsub('\\"', '', x)
+  t1 <- ''        # Шаблоны для сообщения на консоль
+  t2 <- 'четным'  # Является ли входное значение числом и каким
+  y <- tryCatch(  # Если x не приводится к числу, тихо возвращаем NA
+    as.numeric(x),
+    warning = function(w) { # Обязательно ли error/warning должны быть функциями?
+      NA
+    }
+  )
+  res <- y %% 2 == 0
+  if (is.na(res)) {
+    t1 <- 'не'
+    t2 <- ''
+  } else if (!res) {
+    t2 <- paste('не', t2, sep = '')
+  }
+  if (msg) {
+    # Избавление от некрасивых лишних пробелов
+    print(gsub('\\s{2,}', ' ', sprintf('%s %s является %s числом', x, t1, t2)))
+    # Теперь просто люблю sprintf()
+  }
+  return(res)
+}
+is.even(24)
+is.even(111)
+is.even("13")
+is.even("борода")
+```
+
+Функция `is.even()` преобразует введенное пользователем с клавиатуры значение в число и проверяет, является ли оно четным. Если преобразовать исходное значение в число невозможно, возвращается `NA` без предупреждений. При необходимости функция печатает на консоли сообщение на русском языке о результатах проверки.
+
+`is.even(x = readline(prompt = 'Введите число: '), msg = TRUE)`
+
+`x` Значение, вводимое пользователем. По возможности преобразуется в число.
+
+`msg` Логическое значение. Определяет, выводить ли на консоль текстовое сообщение о результатах проверки. По умолчанию `TRUE`.
+
+4. Базовая фунция R `summary()` вычисляет описательные статистики для столбцов таблицы - например, `summary(mtcars)`. Эта функция работает также со списками таблиц (попробуйте выполнить `summary(list(iris, mtcars))`), но результат может показаться неожиданным. Напишите функцию `summary_list()`, которая выполняет для каждой таблицы в передаваемом в качестве аргумента списке те же вычисления, что и `summary()` для отдельно взятой таблицы.
+
+```{r}
+summary_list <- function(l, ...) {
+  if (!is.list(l) | is.data.frame(l)) stop('Input should be a list of tables')
+  lapply(l, summary, ...)
+}
+# summary_list(df) returns an error
+# summary_list(list(df, iris)) works ok
+summary_list(list(df, iris, m = matrix(1:8, ncol = 2)), digits = 11)
+```
