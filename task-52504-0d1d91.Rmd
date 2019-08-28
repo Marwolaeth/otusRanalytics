@@ -1,0 +1,154 @@
+---
+title: "task"
+author: "Oksana"
+date: '27.08.2019 г '
+output: html_document
+---
+title: "R Notebook"
+---
+## Практика оформления R Markdown
+
+Пакет [*knitr*](https://github.com/yihui/knitr) позволяет вставлять куски кода - чанки - прямо в готовый документ и выполнять их согласно канонам **воспроизводимых исследований**.
+
+Текст в R Markdown может быть отформатирован в виде
+
+* маркир-
+* ованного
+* или
+
+1. нумерова
+2. нного
+3. списка
+  + под
+  + спис
+  + ка
+  
+```{r, out.width=400}
+
+knitr::include_graphics("https://cdn4.iconfinder.com/data/icons/reports-and-analytics-3/512/116-512.png")
+
+
+
+```
+
+Возьмем для тестирования датасет airmiles из пакета datasets
+
+```{r}
+data("airmiles")
+str(airmiles)
+summary(airmiles)
+plot(airmiles)
+```
+
+
+Данный датасет содержит `r length(airmiles)` наблюдений.
+
+---
+
+## STOP
+
+Воспроизводимые исследования предполагают, что все процессы, которые разработчик проводил во время своей деятельности, можно повторить также, как это делал он. Это касается и 
+__генерации псевдослучайных чисел__.
+```{r}
+set.seed(1)# делаем наш документ воспроизводимым
+sample(1:10,5)
+```
+
+## Таблицы
+
+Для эстетической привлекательности таблицы в R Markdown могут выводиться не с помощтю консольных команд печати датафеймов, а с помощью специальных пакетов. В knitr есть функция для печати таблиц - *kable*. Также таблицы можно выводить с помощью pander, xtable и DT.
+
+```{r}
+library(gapminder)
+
+##knitr
+knitr::kable(head(gapminder,15), format = "html")
+
+
+##pander
+
+pander::pandoc.table(head(gapminder,15))
+
+
+##xtable
+xtable::xtable(head(gapminder,15))
+  
+##DT
+DT::datatable(head(gapminder,15))
+```
+
+## LaTeX
+$$\LaTeX{}$$
+
+знакомая формула корней квадратного уравнения:
+
+$(ax^2+bx+c=0): x_{1,2}=\frac{-b\pm\sqrt{b^2-4ac}}{2a}$
+
+Попрактикуемся:
+
+(https://www.andreyolegovich.ru/PC/LaTeX.php#formula)
+
+
+$$N = \sum^n_{i=1}\frac{X_i}{\sqrt{b^2 - 4ac}}$$
+
+```#{python eval=FALSE, include=FALSE}
+import pandas as pd
+data = pd.read_csv("https://raw.githubusercontent.com/uiuc-cse/data-fa14/gh-pages/data/iris.csv")
+data[0:4]
+```
+
+
+## GIT + Github
+
+```{r,out.width=450}
+knitr::include_graphics("http://www.phdcomics.com/comics/archive/phd101212s.gif")
+
+```
+
+Install Git:
+
+[Windows:](http://git-scm.com/download/win)
+
+
+[OS X:](http://git-scm.com/download/mac).
+
+_[Debian/Ubuntu:] sudo apt-get install git-core._
+[Other Linux distros:](http://git-scm.com/download/linux).
+
+Создаем аккаунт на Github.
+
+После установки введите в **GIT Bash** следующую информацию:
+
+* git config –global user.name “your GitHub account name”                                 
+* git config –global user.email “GitHubEmail@something.com”
+
+
+1. Заходим в Tools > Options > Git/SVN
+
+```{r,out.width=300}
+knitr::include_graphics("https://i2.wp.com/www.molecularecologist.com/wp-content/uploads/2013/11/Screenshot-2013-11-12-09.53.56-Copy1.png?w=704&ssl=1")
+```
+
+
+Обратите внимание: в поле Git executable должен быть полный путь к Git (git.exe, если Windows)
+
+2. File-New project-Version Control-Git
+
+Копируем в строку ссылки на репо данные из Github
+
+
+3. Чтобы добавить новый удалённый Git-репозиторий под именем-сокращением, к которому будет проще обращаться, выполните:
+
+git remote set-url origin _вставляем ссылку с GITHUB_
+git pull origin master
+git push origin master
+
+## Checkpoint
+Этот пакет обеспечивает воспрозводимость исследований, ставя снэпшот пакетов, актуальных на конкретную дату
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+
+library(checkpoint)
+checkpoint("2019-08-27") 
+```
+

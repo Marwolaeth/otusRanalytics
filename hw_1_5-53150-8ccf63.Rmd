@@ -1,0 +1,185 @@
+---
+title: "hw_1_5"
+author: "Andrej Pawluczenko"
+date: "15.08.2019"
+output: html_document
+---
+
+1. Придумайте и реализуйте S3-класс для хранения типичной информации, наносимой на визитку (имя, фамилия, контакты - почта/телефон и другие, на свой выбор).
+
+```{r}
+create_businesscard <- function(
+  firstname, lastname, occupation, company = NULL,
+  phone, cellphone = NULL, fax = NULL, email
+) {
+  return(
+    structure(
+      list(
+        firstname  = firstname,
+        lastname   = lastname,
+        occupation = occupation,
+        company    = company,
+        phone      = phone,
+        cellphone  = cellphone,
+        fax        = fax,
+        email      = email,
+        fieldnames_ru  =  c( # этот список не помешало бы сделать private
+          firstname  = "ИМЯ",
+          lastname   = "ФАМИЛИЯ",
+          occupation = "ДОЛЖНОСТЬ",
+          company    = "ОРГАНИЗАЦИЯ",
+          phone      = "ТЕЛ.",
+          cellphone  = "МОБ.",
+          fax        = "ФАКС",
+          email      = "email"
+        )
+      ),
+      class = 'businesscard'
+    )
+  )
+}
+
+bc_test <- create_businesscard(
+  firstname  = 'Вадим',
+  lastname   = 'Бестужев',
+  occupation = 'Менеджер по работе с ключевыми клиентами',
+  company    = 'Вектор',
+  phone      = '8 (87240) 2-09-33',
+  cellphone  = '+7 969 666-11-13',
+  email      = 'VBestuzhev@vector.io'
+)
+str(bc_test)
+class(bc_test)
+```
+
+2. Напишите метод для красивого вывода содержимого объекта из первого задания в консоль. Метод можно назвать, к примеру, print. Под красивым выводом подразумевается, что каждый элемент будет выведен с соответствующей заметкой (например: к полю имя сделать вывод "ИМЯ: S3$name").
+
+```{r}
+print.businesscard <- function(bc, uppercase = NULL, fieldnames = NULL) {
+  if (length(uppercase)) bc[uppercase] <- lapply(bc[uppercase], toupper)
+  if (length(fieldnames)) {
+    for (i in fieldnames) {
+      bc[[i]] <- paste(bc$fieldnames_ru[[i]], bc[[i]], sep = ': ')
+    }
+  }
+  padding <- sapply(bc[1:8], function(x) (48 - nchar(x)) %/% 2)
+  output <- paste0("+==============================================+\n",
+                if (length(bc$company)) {
+                  paste0(
+                    bc$company,                                 "\n",
+                    paste(rep(' ', 48), collapse = ''),         "\n",
+                    paste(rep(' ', 48), collapse = ''),         "\n"
+                  )
+                },
+                paste(rep(' ', padding[['firstname']]), collapse = ''),
+                bc$firstname,
+                paste(rep(' ', padding[['firstname']]), collapse = ''),
+                                                                "\n",
+                paste(rep(' ', padding[['lastname']]), collapse = ''),
+                bc$lastname,
+                paste(rep(' ', padding[['lastname']]), collapse = ''),
+                                                                "\n",
+                paste(rep(' ', 48), collapse = ''),             "\n",
+                paste(rep(' ', padding[['occupation']]), collapse = ''),
+                bc$occupation,
+                paste(rep(' ', padding[['occupation']]), collapse = ''),
+                                                                "\n",
+                "                                                \n",
+                "                                                \n",
+                paste(rep(' ', padding[['phone']] * 2), collapse = ''),
+                bc$phone,                                       "\n",
+                if (length(bc$cellphone)) {
+                  paste0(
+                    paste(rep(' ', padding[['cellphone']] * 2), collapse = ''),
+                    bc$cellphone,                               "\n"
+                  )
+                },
+                if (length(bc$fax)) {
+                  paste0(
+                    paste(rep(' ', padding[['fax']] * 2), collapse = ''),
+                    bc$fax,                                     "\n"
+                  )
+                },
+                paste(rep(' ', padding[['email']] * 2), collapse = ''),
+                bc$email,                                       "\n",
+                "+==============================================+\n")
+  cat(output)
+  return(invisible(bc))
+}
+
+print(bc_test)
+print(        # Вывод с измененными параметрами
+  bc_test,
+  uppercase = 1:2,
+  fieldnames = c('phone', 'cellphone', 'email')
+)
+```
+
+3. Найдите все методы, доступные для функции `summary()` и для класса `matrix`.
+
+```{r}
+methods('summary')
+methods(class = 'matrix')
+```
+
+4. Задача со звездочкой. Напишите функцию, выполняющую транслитерацию произвольного текста.
+
+```{r}
+translit <- function(text) { # Функция с циклами, по другому не получилось (((
+  lat.up <- c("A","B","V","G","D","E","YO","ZH","Z","I","J","K",
+              "L","M","N","O","P","R","S","T","U","F","KH","C","CH",
+              "SH","SHH","''","Y","'","E'","YU","YA")
+  rus.up <- c("А","Б","В","Г","Д","Е","Ё","Ж","З","И","Й","К","Л","М","Н",
+              "О","П","Р","С","Т","У","Ф","Х","Ц","Ч","Ш","Щ","Ъ","Ы","Ь",
+              "Э","Ю","Я")
+  lat.low <- c("a","b","v","g","d","e","yo","zh","z","i","j","k","l","m","n",
+               "o","p","r","s","t","u","f","kh","c","ch","sh","shh","''","y",
+               "'","e'","yu","ya")
+  rus.low <- c("а","б","в","г","д","е","ё","ж","з","и","й","к","л","м","н","о",
+               "п","р","с","т","у","ф","х","ц","ч","ш","щ","ъ","ы","ь",
+               "э","ю","я")
+ transdict <- data.frame(
+   rus = c(rus.up, rus.low),
+   lat = c(lat.up, lat.low),
+   stringsAsFactors = FALSE
+ )
+ transdict$ngraphs <- nchar(transdict$lat)
+ transdict <- transdict[order(transdict$ngraphs, decreasing = TRUE), ]
+ trans_text <- text
+ if (any(sapply(c(rus.low, rus.up), function(x) grepl(x, text)))) {
+   for (ltr in 1:nrow(transdict)) {
+     trans_text <- gsub(transdict$rus[[ltr]], transdict$lat[[ltr]], trans_text)
+   }
+ } else if (any(sapply(c(lat.low, lat.up), function(x) grepl(x, text)))) {
+   for (ltr in 1:nrow(transdict)) {
+     trans_text <- gsub(transdict$lat[[ltr]], transdict$rus[[ltr]], trans_text)
+   }
+ }
+ return(trans_text)
+}
+
+translit(c('KGB', 'SHazam', 'Last.fm'))
+translit(
+  c('Информация к размышлению','Секретное донесение','По щучьему велению')
+)
+```
+
+___
+
+Критерии оценивания: 
+
+ * Домашнаяя работа сдана, работа содержит наработки решения (1 балл)
+ * Решена 1 задача (2 балла)
+ * Решена 2 задача (2 балла)
+ * Решена 3 задача (1 балл)
+ * Задание сдано до рекомендуемого дедлайна (2 балла)
+ * Код оформлен согласно рекомендациям tidyverse (1 балл)
+ * Задание сдано с 1 раза (нет необходимости в доработках) (1 балл)
+ 
+Дополнительные баллы:
+ * В 1 задаче помимо объекта класса S3 реализиван класс другого типа (S4, R6, RC) - (макс 2 балла)
+ * Решена 4 задача (3 балла)
+ 
+Задание считается выполненным, если набирается 7 баллов
+ 
+ 
