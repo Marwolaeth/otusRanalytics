@@ -37,7 +37,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ![Открытка с видами кантона Невшатель](https://i.etsystatic.com/10063841/d/il/4fc81f/1896031970/il_340x270.1896031970_tt8r.jpg?version=0)
 
-Таблица содержит 6 социоэкономических показателей для каждого из 47 франкоязычных округов (‘district’) Швейцарии за 1988 год:
+Таблица содержит 6 социоэкономических показателей для каждого из 47 франкоязычных округов (‘district’) Швейцарии за 1988 год ([официальное описание](https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/swiss.html) от авторов пакета `datasets` на сайте высшей технической школы Цюриха):
 
 | Переменная           	| Описание                                                        	|
 |----------------------	|-----------------------------------------------------------------	|
@@ -55,7 +55,83 @@ knitr::opts_chunk$set(echo = TRUE)
 ----------------
 ### Размерность и структура данных
 
-хуй
+Рассмотрим структуру и сводные статистики набора данных.
+
+```{r}
+data(swiss)    # набор данных из пакета datasets доступны в базовом окружении R
+class(swiss)   # data.frame, как и следовало ожидать
+dim(swiss)     # количество строк и столбцов (наблюдений и переменных)
+str(swiss)     # структура набора данных: переменные и их типы
+summary(swiss) # сводные статистики по переменным
+```
+
+Функции для «первого знакомства» с датасетом и просмотр первых 10 строк таблицы с данными демонстрируют (что и указано в описании), что все переменные являются числовыми и заключены в промежутке от о до 100.
+
+```{r}
+knitr::kable(head(swiss, 10), format = 'markdown')
+```
+
+### Разведочный анализ данных
+
+Поскольку все переменные в наборе данных числовые, стоит оценить их распределение и корреляцию между ними/
+
+```{r}
+# Функция для добавления гистограмм на диаграмму корреляционной матрицы
+# Можно найти в справке для функции pairs()
+panel_hist <- function(x, ...) 
+{
+    usr <- par('usr')
+    on.exit(par(usr))
+    par(usr = c(usr[1:2], 0, 1.5))
+    h <- hist(x, plot = FALSE)
+    breaks <- h$breaks
+    nB <- length(breaks)
+    y <- h$counts
+    y <- y / max(y)
+    rect(breaks[-nB], 0, breaks[-1], y, col = 'cyan', ...)
+}
+
+# Функция для отображения коэффициента корреляции на диаграмме коррел. матрицы
+panel_cor <- function(x, y, digits = 2, prefix = '', cex.cor, ...)
+{
+    usr <- par('usr')
+    on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    r <- abs(cor(x, y))
+    txt <- format(c(r, 0.123456789), digits = digits)[1]
+    txt <- paste0(prefix, txt)
+    if(missing(cex.cor)) cex.cor <- 0.8 / strwidth(txt)
+    text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+# Визуализация корреляционной матрицы: попарные диаграммы рассеяния для переменных
+pairs(swiss, upper.panel = panel_cor, diag.panel = panel_hist)
+```
+
+Что можно понять из этих диаграмм? Например, что:
+
+* распределения большинства переменных — унимодальное, за исключением доли католического населения, по которому наблюдаются два резко противопоставленных друг другу кластера;
+* для некоторых пар переменных наблюдается выраженная корреляция.
+
+Рассмотрим подробнее взаимоотношения некоторых переменных с показателем фертильности, который чаще всего рассматривается как зависимая переменная при работе с данными из набора `swiss`.
+
+```{r}
+# Стандартная диаграмма рассеяния
+plot(swiss$Agriculture, swiss$Fertility)
+# Добавляем визуализацию линейной зависимости между переменными
+abline(fit <- lm(Fertility ~ Agriculture, data = swiss), col = 'red')
+
+plot(swiss$Examination, swiss$Fertility)
+abline(fit <- lm(Fertility ~ Examination, data = swiss), col = 'red')
+
+plot(swiss$Education, swiss$Fertility)
+abline(fit <- lm(Fertility ~ Education, data = swiss), col = 'red')
+
+# То же самое, но с логарифмической трансформацией переменных
+plot(log(swiss$Education), log(swiss$Fertility))
+abline(fit <- lm(log(Fertility) ~ log(Education), data = swiss), col = 'red')
+```
+
+Видно, что переменная Fertility (слабо)положительно коррелирует с переменной Agriculture и отрицательно с переменными Examination и Education. Эта информация пригодится, например, при построении многомерной линейной регрессии на коэффициент фертильности (при этом важно учитывать корреляцию между самими независимыми переменными).
 
 ### Использованные ресурсы
 
@@ -63,4 +139,4 @@ knitr::opts_chunk$set(echo = TRUE)
 
 2. Van der Walle, Francine. "Education and the Demographic Transition in Switzerland.*"Population and Development Review*, vol. 6, no. 3. 1980.
 
-3. Coale, Ansley J. (1967).  “The decline of fertility in Europe from the French Revolution to World War II,” in S. J. Behrman and Leslie Corsa, Eds. *Fertility and Family Planning: A World View*. Ann Arbor: University of Michigan Press: 3–24.
+3. Coale, Ansley J. (1969).  “The decline of fertility in Europe from the French Revolution to World War II,” in S. J. Behrman and Leslie Corsa, Eds. *Fertility and Family Planning: A World View*. Ann Arbor: University of Michigan Press: 3–24.
