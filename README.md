@@ -1,6 +1,5 @@
 # otusRanalytics
-Otus R Analytics course files and projects
 
-Long Live Rock'n'Roll!
+Файлы и данные для заданий и проектов курса Otus «Прикладная аналитика на R».
 
-Goth's Undead!
+Файлы с домашними заданиями имеют название вида "hw_\d_\d-.*", где числа обозначают соответственно номер модуля и номер урока.
