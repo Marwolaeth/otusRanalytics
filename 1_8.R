@@ -9,3 +9,9 @@ str_replace_all(x, 'Y', 'Z')
 
 # отлично!
 pacman::p_load(tidytext, tm, udpipe, update = TRUE)
+
+x <- 1:10
+y <- 4:13
+plot(x, y)
+plot(x, y, type = 's')
+plot(x, y, type = 'S')
