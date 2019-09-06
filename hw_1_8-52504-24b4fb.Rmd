@@ -1,0 +1,110 @@
+---
+title: "hw_1_8"
+author: "Oksana Laputskaya"
+date: '3 сентября 2019 г '
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+# Быстрая установка и загрузка отсутствующих пакетов
+if(!require('pacman')) install.packages('pacman')
+pacman::p_load(RJDBC, DBI, rJava)
+```
+
+Попробуйте найти причину возникновения ошибки, указанной в презентации, и способы избавления от нее. В работе должны быть обязательно приложены ссылки на используемые материалы.
+
+```
+Решение: вызывать `rJava::.jinit()` непосредственно перед выполнением запроса к БД.
+```
+
+Далее изложен ход поиска решения.
+
+## Поиск решения для ошибки RJDBC
+
+Ошибка, причину и решение которой необходимо найти, выглядит так:
+
+![Ошибка при вызове (предположительно) функции из `rJava`](Images/1_8_err.jpg)
+
+### Поиск источников ошибки
+
+Функция, выдающая ошибку (`.jcheck()`) принадлежит пакету `rJava`. Как указано в [статье](https://www.developer.com/java/ent/getting-started-with-r-using-java.html#Item5) на developer.com, вызов функции `jinit()` действительно необходим перед использований функций `rJava` и без него появляется та самая ошибка:
+
+```{r error=TRUE, echo=FALSE}
+javaImport(packages = 'java.util')
+```
+
+Официальный [мануал](https://cran.r-project.org/web/packages/RJDBC/RJDBC.pdf) пакета `RJDBC` малоинформативен. Вместо функций в нем перечислены методы из пакета `DBI` для объектов класса `RJDBCDriver`, который создает функция `RJDBC()`.
+
+Поиск в Google по [запросу](https://www.google.com/search?newwindow=1&sxsrf=ACYBGNQpfylWQnxAKLfD7tBvvoB3XGTq1A%3A1567778345773&ei=KWZyXbToLqnjmwWXraGQBQ&q=r+error+in+jcheck+"no+running+jvm+detected") ‘r error in jcheck "no running jvm detected"’ показал следующие результаты:
+
+https://r.789695.n4.nabble.com/Problem-with-rJava-td4716438.html — явно не наш случай;
+
+https://www.developer.com/java/ent/getting-started-with-r-using-java.html — указанная выше статья-туториал по `rJava`;
+
+https://stackoverflow.com/questions/38200513/rjava-no-running-jvm-found-error-jinit-also-not-working — вопрос без ответа на StackOverflow.
+
+Поиск по [запросу](https://www.google.com/search?newwindow=1&sxsrf=ACYBGNQpfylWQnxAKLfD7tBvvoB3XGTq1A%3A1567778345773&ei=KWZyXbToLqnjmwWXraGQBQ&q=r+error+in+jcheck+"no+running+jvm+detected"+rjdbc) ‘r error in jcheck "no running jvm detected" rjdbc’ (с указанием названия пакета) показал:
+
+https://stackoverflow.com/questions/45320536/rjdbc-parallel-query-with-parallelmap;
+
+https://stackoverflow.com/questions/37166889/multidplyr-with-database-connection;
+
+https://www.reddit.com/r/Rlanguage/comments/8ujern/works_locally_for_me_on_r_but_not_on_my_server/e1fz4p7/?context=8&depth=9.
+
+Что характерно, в обоих вопросах на StackOverflow речь идет об обращении к базе данных посредством методов `RJDBC` изнутри функции, выполняющих параллельные вычисления на нескольких ядрах процессора.
+
+В [ответе](https://stackoverflow.com/a/45502001/3443500) на первый вопрос пользователю советуют вызывать `.jinit()` внутри функции выгрузки из базы данных, во втором [вопросе](https://stackoverflow.com/a/41909255/3443500) — определять соединение с БД (`dbConnect()`) для каждого кластера (процессора) по отдельности.
+
+Наконец, в обсуждении на Reddit разработчику снова [советуют](https://www.reddit.com/r/Rlanguage/comments/8ujern/works_locally_for_me_on_r_but_not_on_my_server/e1g0l8w/) вызывать `.jinit()` непосредственно перед выполнением команд из пакета `RJDBC`.
+
+### Попытка воспроизвести ошибку
+
+Мне воспроизвести указанную ошибку не удалось.
+
+Поначалу не получалось даже подключиться к базе данных (полученной от коллег):
+
+```{r error=TRUE}
+drv <- JDBC(
+  'org.sqlite.JDBC',
+  'db/sqlite-jdbc-3.7.2.jar',
+  identifier.quote = '"'
+)
+con <- dbConnect(drv, 'db/media_writers.rqda')
+```
+
+Решение пришлось искать между строк мануала `RJDBC`:
+
+```
+‘Due to the fact that the actual JDBC driver is selected in the URL, the JDBCDriver object itself has
+little significance and is not used to determine the connection type.’
+```
+
+Т. е., драйвер JDBC должен быть указан в аргументе url функции `JDBC()`. И действительно: во всех примерах подключения к БД даже непосредственно на Java (например, [здесь](https://devcolibri.com/%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D0%B0-%D1%81-%D0%B1%D0%B4-mysql-postgresql-%D1%81-%D0%BF%D0%BE%D0%BC%D0%BE%D1%89%D1%8C%D1%8E-jdbc-%D0%B4%D1%80%D0%B0%D0%B9%D0%B2%D0%B5%D1%80%D0%B0/) и [тут](http://qaru.site/questions/134607/how-to-connect-sqlite-with-java)) указан класс драйвера.
+
+После этого получилось загрузить БД и выполнить запрос (загрузить кодовую книгу контент-аналитического проекта; код подсказан доброжелателем):
+
+```{r}
+drv <- JDBC(
+  'org.sqlite.JDBC',
+  'db/sqlite-jdbc-3.7.2.jar',
+  identifier.quote = '"'
+)
+con <- dbConnect(drv, 'jdbc:sqlite:db/media_writers.rqda')
+codebook <- dbGetQuery(
+  con,
+  'SELECT catid, category, cid, name AS code FROM freecode
+    LEFT JOIN treecode AS tree
+    ON tree.cid = freecode.id
+      LEFT JOIN (SELECT name AS category, catid AS id FROM codecat) AS cat
+      ON cat.id = tree.catid
+      ORDER BY catid, cid;'
+)
+str(codebook)
+```
+
+Таким образом, воспроизвести ошибку снова не получилось.
+
+Предположительно, успешность выполнения кода зависит от наличия на машине Java и связанных с ней библиотек, а также от глобальных параметров R и конкретного окружения (как в случае с окружениями кластеров при параллельных вычислениях, например, [здесь](https://stackoverflow.com/questions/45320536/rjdbc-parallel-query-with-parallelmap)).
+
+Универсальным решением видится вызов `rJava::.jinit()` непосредственно перед выполнением запроса к БД.
