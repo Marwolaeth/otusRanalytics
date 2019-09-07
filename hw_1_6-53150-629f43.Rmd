@@ -67,8 +67,28 @@ x <- purrr::map(
 ) %>%
   do.call(c, .)
 hist(x, breaks = 15)
-```
 
+lst2 <- transpose(lst)
+
+rnorm_map <- function(.l, n = 100, seed = 1111) {
+  set.seed(seed = seed)
+  purrr::map(
+  .l,
+  ~ rnorm(n = n, .[1], .[2])
+) %>%
+  do.call(c, .)
+}
+
+rnorm_map2 <- function(.l, n = 100, seed = 1111) {
+  set.seed(seed = seed)
+  purrr::map2(
+  .l[[1]],
+  .l[[2]],
+  ~ rnorm(1000, .x, .y)
+) %>%
+  do.call(c, args = .)
+}
+```
 ___
 
 Критерии оценивания:
