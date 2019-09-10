@@ -1,0 +1,34 @@
+---
+title: "install.packages"
+output: html_document
+---
+
+
+```{r results='hide', message=FALSE, warning=FALSE}
+
+if(!require("microbenchmark")) install.packages("microbenchmark") 
+if(!require("readxl")) install.packages("readxl")
+if(!require("data.table")) install.packages("data.table")
+if(!require("R.utils")) install.packages("R.utils")
+if(!require("feather")) install.packages("feather")
+if(!require("fst")) install.packages("fst") 
+
+```
+
+***
+
+### Документация для ознакомления
+
+[microbenchmark](https://www.rdocumentation.org/packages/microbenchmark/versions/1.4-6/topics/microbenchmark)  
+[readxl](https://readxl.tidyverse.org/index.html)  
+[readxl](https://www.rdocumentation.org/packages/readxl/versions/1.3.1)  [data.table](https://www.rdocumentationI.org/packages/data.table/versions/1.12.2)  
+[feather](https://www.rdocumentation.org/packages/feather/versions/0.3.3)  
+[fst](https://www.rdocumentation.org/packages/fst/versions/0.9.0)  
+
+***
+
+### Утилиты (for Windows)
+
+[Curl](https://curl.haxx.se/windows)
+
+[Cygwin](https://www.cygwin.com)
