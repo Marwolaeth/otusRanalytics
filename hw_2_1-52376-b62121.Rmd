@@ -10,6 +10,13 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 ## ДЗ 2.1 Источники данных
 
+```{r results='hide', message=FALSE, warning=FALSE}
+if(!require(pacman)) install.packages('pacman')    # Подсказано Алексеем Катиным
+pacman::p_load(microbenchmark, readxl, data.table, R.utils, feather, fst)
+```
+
+### Задание
+
 1. Для упражнения используются данные морфологического словаря, скаченного на сегодняшнем уроке и сохраненного в переменную oc3.  
 [ссылка.zip](http://opencorpora.org/files/export/dict/dict.opcorpora.txt.zip)  
 В случае, если данные не были сохранены, вновь скачайте данный файл (произвольным способом) загрузив данные в переменную oc3. Можно использовать изученные на занятии настройки fread. Словарь должен быть очищен от пустых, индексных строк и разделен на два столбца, первый из которых содержит слово в кириллице, второй теги.
@@ -40,3 +47,102 @@ fst::write_fst()
 
 **Минимальное количество баллов для зачета - 4**
 
+### Решение
+
+```{r}
+# Не удается добавить к аргументу консольную команду
+# Если аргумент -- это URL zip-архива
+# Поэтому проще скачать и распаковать архив
+
+if (!file.exists('dict.opcorpora.txt')) {
+  if (!file.exists('dict.opcorpora.txt.zip')) {
+    download.file(
+      'http://opencorpora.org/files/export/dict/dict.opcorpora.txt.zip',
+      destfile = 'dict.opcorpora.txt.zip'
+    )
+  }
+  unzip('dict.opcorpora.txt.zip')
+}
+
+oc3 <- fread(
+  'grep -v ^[0-9] dict.opcorpora.txt', # Сам бы никогда не догадался
+  encoding = 'UTF-8',
+  header = FALSE,
+  sep = '\t',
+  sep2 = ',',
+  blank.lines.skip = TRUE,
+  nThread = 3
+)
+
+# Стандартная процедура проверки
+class(oc3)
+dim(oc3)
+names(oc3)
+str(oc3, 1)
+summary(oc3)
+head(oc3, 20)
+
+# Создаем функции для microbenchmark()
+# Чтобы было проще вводить их в качестве аргументов и выводить в результат
+writeLines.dict <- function() {
+  # Если не преобразовать в текст
+  # выдает ошибку: can only write character objects 
+  writeLines(
+    apply(oc3, 1, paste, collapse = ' '),
+    'dict.opcorpora_wl.txt')
+}
+
+write.csv.dict <- function() {
+  write.csv(oc3, 'dict.opcorpora.csv')
+}
+
+fwrite_2t.dict <- function() {
+  # fwrite() using 2 threads
+  data.table::fwrite(oc3, 'dict.opcorpora_fw.csv', nThread = 2)
+}
+
+fwrite_3t.dict <- function() {
+  # fwrite() using 3 threads
+  data.table::fwrite(oc3, 'dict.opcorpora_fw.csv', nThread = 3)
+}
+
+write_feather.dict <- function() {
+  feather::write_feather(oc3, 'dict.opcorpora.feather')
+}
+
+write_fst.dict <- function() {
+  fst::write_fst(oc3, 'dict.opcorpora.fst')
+}
+
+bm_write_dict <- microbenchmark(
+  writeLines.dict(),
+  write.csv.dict(),
+  fwrite_2t.dict(),
+  fwrite_3t.dict(),
+  write_feather.dict(),
+  write_fst.dict(),
+  times = 3L
+)
+bm_write_dict
+
+str(bm_write_dict)
+# ?summary.microbenchmark # Возвращает data.frame, можно задать единицу измерения
+summary(bm_write_dict, unit = 's')
+
+# Упорядоченный вид результата microbenchmark()
+# от самого быстрого к самому медленному
+bm_write_dict_summary <- data.table(
+  summary(bm_write_dict, unit = 's'),
+  key = 'expr'
+)
+data.table::setorderv(
+  bm_write_dict_summary,
+  cols = 'median',
+  order = 1L
+)
+bm_write_dict_summary
+```
+
+### Заключение
+
+Самым быстрым методом записи данных в файл является `data.table::fwrite()`, причем скорость записи зависит от количества задействованных ядер процессора. Самыми медленными являются «родные» функции R: `write.csv()` и `writeLines()`.
