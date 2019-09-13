@@ -20,7 +20,11 @@ lst <- list(
 )
 lst2 <- transpose(lst)
 
+<<<<<<< HEAD
+rnorm_map <- function(.l, n = 100L, seed = 1111) {
+=======
 rnorm_map <- function(.l, n = 100, seed = 1111) {
+>>>>>>> d472d53676c8acf06e0aa64e70c38e6a2785e29d
   set.seed(seed = seed)
   purrr::map(
     .l,
@@ -29,7 +33,11 @@ rnorm_map <- function(.l, n = 100, seed = 1111) {
     do.call(c, .)
 }
 
+<<<<<<< HEAD
+rnorm_map2 <- function(.l, n = 100L, seed = 1111) {
+=======
 rnorm_map2 <- function(.l, n = 100, seed = 1111) {
+>>>>>>> d472d53676c8acf06e0aa64e70c38e6a2785e29d
   set.seed(seed = seed)
   purrr::map2(
     .l[[1]],
@@ -41,8 +49,20 @@ rnorm_map2 <- function(.l, n = 100, seed = 1111) {
 
 identical(rnorm_map(lst), rnorm_map2(lst2))
 
+<<<<<<< HEAD
+system.time(rnorm_map(lst, n = 1000L))
+system.time(rnorm_map2(lst2, n = 1000L))
+
+mbm <- microbenchmark(
+  rnorm_map(lst, n = 1000L), rnorm_map2(lst2, n = 1000L),
+  times = 10000L
+)
+summary(mbm)
+str(mbm, 1)
+=======
 mbm <- microbenchmark(
   rnorm_map(lst), rnorm_map2(lst2),
   times = 10000L
 )
 summary(mbm)
+>>>>>>> d472d53676c8acf06e0aa64e70c38e6a2785e29d
