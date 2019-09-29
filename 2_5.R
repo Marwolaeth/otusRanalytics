@@ -73,7 +73,8 @@ flights[, lapply(.SD, mean), by = month, .SDcols = c('dep_delay', 'arr_delay')]
 ################
 
 flights[carrier %chin% c('AA', 'US'), .(mean_arr_time = mean(arr_time)), by = month]
-flights[carrier %chin% c('AA', 'US'), .(mean_arr_time = mean(arr_time)), by = .(carrier, month)]
+flights[carrier %chin% c('AA', 'US'),
+        .(mean_arr_time = mean(arr_time)), by = .(carrier, month)]
 flights[, uniqueN(tailnum), by = .(month, origin)]
 
 flights[, lapply(.SD, uniqueN), by = .(month, origin), .SDcols = c('tailnum', 'dest')]
