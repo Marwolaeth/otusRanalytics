@@ -12,7 +12,7 @@ str(bank_data)
 summary(bank_data, maxsum = 13)
 bank_data
 bank_data[(age %in% 25:40) &
-            (job %chin% c('entrepreneur', 'self-employed')) &
+            (job %in% c('entrepreneur', 'self-employed')) &
             (loan == 'no') & (housing == 'no')]
 
 bank_data[job == 'unknown' | education == 'unknown']
@@ -39,3 +39,8 @@ qqnorm(log(dur_sample), plot.it = T)
 
 summary(dur_sample)
 hist(log(dur_sample), breaks = 20)
+
+bank_data[, uniqueN(job)]
+bank_data[, .SD[balance > mean(balance),
+                .(.N, mean_balance = mean(balance))],
+          by = job]
