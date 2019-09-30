@@ -38,6 +38,8 @@ flights[tailnum %like% '^N3']
 flights[, .(dep_delay)]
 flights[, 'dep_delay']
 flights[, c('dep_delay', 'dep_time')] # Только для функций
+flights[, -c('dep_delay')]
+flights[, -'dep_delay']
 
 flights[, .(DEPARTURE = dep_time, ARRIVAL = arr_time)]
 
