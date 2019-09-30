@@ -38,6 +38,8 @@ flights[tailnum %like% '^N3']
 flights[, .(dep_delay)]
 flights[, 'dep_delay']
 flights[, c('dep_delay', 'dep_time')] # Только для функций
+flights[, -c('dep_delay')]
+flights[, -'dep_delay']
 
 flights[, .(DEPARTURE = dep_time, ARRIVAL = arr_time)]
 
@@ -61,6 +63,7 @@ flights[, .(MEAN_DEP_DELAY = mean(dep_delay)), by = .(carrier, month)]
 flights[, .N]
 flights[.N]  # Последнее наблюдение
 flights[, .N, by = carrier]
+flights[, .N, by = .(carrier)] # но зочем??
 
 flights[, .N, by = carrier][order(N)]
 flights[, .N, by = carrier][order(N)][1:3]
