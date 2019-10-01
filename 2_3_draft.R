@@ -1,10 +1,16 @@
 if (!require(data.table)) install.packages('data.table')
 library(data.table)
-download.file('https://archive.ics.uci.edu/ml/machine-learning-databases/00222/bank.zip', destfile = 'bank.zip')
-unzip('bank.zip', exdir = 'bank')
+if (!file.exists('bank/bank-full.csv')) {
+  download.file(
+    'https://archive.ics.uci.edu/ml/machine-learning-databases/00222/bank.zip',
+    destfile = 'bank.zip'
+  )
+  unzip('bank.zip', exdir = 'bank')
+}
+
 bank_data <- fread(
-  "bank/bank-full.csv",
-  stringsAsFactors = TRUE # Все строки в датасете — факторы
+  'bank/bank-full.csv',
+  stringsAsFactors = TRUE # Все строковые переменные в датасете — факторы
 )
 
 dim(bank_data)
@@ -12,7 +18,7 @@ str(bank_data)
 summary(bank_data, maxsum = 13)
 bank_data
 bank_data[(age %in% 25:40) &
-            (job %chin% c('entrepreneur', 'self-employed')) &
+            (job %in% c('entrepreneur', 'self-employed')) &
             (loan == 'no') & (housing == 'no')]
 
 bank_data[job == 'unknown' | education == 'unknown']
@@ -39,3 +45,15 @@ qqnorm(log(dur_sample), plot.it = T)
 
 summary(dur_sample)
 hist(log(dur_sample), breaks = 20)
+
+bank_data[, uniqueN(job)]
+bank_data[, .SD[balance > mean(balance),
+                .(.N, mean_balance = mean(balance))],
+          by = job]
+
+hist(bank_data[, balance])
+hist(log(bank_data[, balance]))
+
+bank_data[, .(mean = mean(balance), median = median(balance)), by = job]
+bank_data[, .(mean = mean(balance), median = median(balance)), keyby = job]
+bank_data[, .(.N, mean = mean(balance), median = median(balance)), keyby = .(job, education)]
