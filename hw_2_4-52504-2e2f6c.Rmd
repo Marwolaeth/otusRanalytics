@@ -1,0 +1,57 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r echo=FALSE}
+
+```
+
+##Текстовые и неструктурированные данные. 
+
+1. Достать данные по расстояниям между любыми пятью городами через API. Адрес сервера 'htmlweb.ru/geo/api.php?' Должен быть отдельный GET запрос на получение id города и на получение расстояний между всеми городами попарно. 
+Итоговый файл должен содержать получение id городов по названию + таблицу с расстояниями между городами.
+Для кодирования названий городов можно воспользоваться **htmltools::urlEncodePath()**
+Чтобы обойти счетчик действий для незарегистрированного юзера, можно воспользоваться пакетом **get_proxy()**
+
+```{r}
+
+```
+
+*Задание считается выполненным, когда: *
+
+* Прислан файл или (1 балл)
+* Получены данные из API по обоим частям задания, сохранены в переменные (1 балл)
+* Построена матрица расстояний
+
+2. 
+```{r}
+library(httr)
+library(rvest)
+webpage <- read_html('http://primamedia.ru')
+number_html <- html_nodes(webpage, ".mp-mn-post")
+number_html[13]%>%html_text()
+
+```
+
+*Задание:* с помощью функций работы со строками извлеките из списка number_html все статьи и время их появления и сохраните в табличном виде
+
+3.
+```{r}
+set.seed(9)
+#генерируем телефонные номера
+phones<-cbind(79000000000+sample(0:999999999,3,replace=F))%>%as.data.frame()
+JSON<-GET(paste0("https://www.kody.su/api/v2.1/search.json?q=+)",phones$V1[1],"&key=test"))
+xml<-GET(paste0("https://www.kody.su/api/v2.1/search.xml?q=+)",phones$V1[1],"&key=test"))
+xml_doc <- read_xml(xml)
+flatxml<-cbind(xml_find_all(xml_doc,"//query")%>%xml_text(),xml_find_all(xml_doc,"//numbers/number/operator")%>%xml_text(),xml_find_all(xml_doc,"//numbers/number/region")%>%xml_text())
+
+flatJSON<-fromJSON(as.character(JSON),simplifyVector = TRUE,flatten = T)
+
+```
+*Задание:* Дополните получение данных в формате JSON так, чтобы получить таблицу Номер -оператор-регион. 
+
+
+
