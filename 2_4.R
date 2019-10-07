@@ -138,3 +138,32 @@ distances_matrix <- distances_df %>%
   spread(key = city2, value = distance, fill = 0) %>%
   column_to_rownames('city1') %>%
   as.matrix()
+
+# Временный фикс из-за недоступности API kody.su (из примера на сайте):
+JSON <- toJSON(
+  str_remove_all(
+    '{
+    "success": true,
+    "query": "79040000000",
+    "quota": 91,
+    "numbers": [
+    {
+    "number_current": ["79040000000"],
+    "success": [true],
+    "number_type": [1],
+    "def": ["904"],
+    "number": ["0000000"],
+    "code_start": ["0000000"],
+    "code_end": ["0299999"],
+    "operator": ["Tele2"],
+    "operator_full": ["ЗАО Смоленская Сотовая Связь Тверь"],
+    "region": ["Тверская область"],
+    "time": ["3.0"],
+    "bdpn": [false],
+    "bdpn_operator": [""]
+    }
+    ]
+    }',
+'\\n'
+  ) %>% str_replace_all('\\s+', ' ')
+)
