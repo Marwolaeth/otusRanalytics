@@ -7,7 +7,7 @@ output:
     df_print: paged
 ---
 
-```{r results='hide', include=TRUE, echo=FALSE}
+```{r results='hide', include=TRUE, echo=FALSE, message=FALSE}
 if(!require('pacman')) install.packages('pacman')
 pacman::p_load(httr, rvest, jsonlite, tidyverse, getProxy)
 ```
@@ -230,6 +230,7 @@ JSON$temp <- '{
 	}]
 }'
 flatJSON <- fromJSON(JSON$temp, simplifyVector = TRUE, flatten = T)
+# str(flatJSON)
 (flatJSON <- flatJSON$numbers[, c('number_current', 'operator', 'region')])
 ```
 *Задание:* Дополните получение данных в формате JSON так, чтобы получить таблицу Номер -оператор-регион. 
