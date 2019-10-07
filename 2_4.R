@@ -35,23 +35,22 @@ get_cities <- function(cities, api_key = NULL, sleep = 0) {
   cities_df <- data.frame()
   base_url <- 'https://htmlweb.ru/geo/api.php?json'
   for (city in cities) {
-    Sys.sleep(sleep)
+    # Sys.sleep(sleep)
     result <- GET(
       base_url,
       query = list(
         city_name = city,
-        api_key = api_key,
+        # api_key = api_key,
         charset = 'utf-8'
       )
     )
     city_df <- content(result)
-    city_df$limit <- NULL # Избавляемся от не-датасета в хвосте списка
-    city_df <- do.call(
-      rbind,
-      lapply(denullify(city_df), as.data.frame, stringsAsFactors = FALSE)
-    )
-    # Забираем первый, самое релевантный результат поиска
-    cities_df <- rbind(cities_df, city_df[1, c('id', 'name', 'country')])
+    city_df <- city_df %>%
+      .[[1]] %>%          # Забираем первый, самое релевантный результат поиска
+      .[map_lgl(., ~ length(.) > 0)] %>%
+      as_tibble() %>%
+      select(id, name, country)
+    cities_df <- rbind(cities_df, city_df)
   }
   return(cities_df)
 }

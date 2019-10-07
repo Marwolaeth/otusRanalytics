@@ -5,15 +5,9 @@ output:
     df_print: paged
 ---
 
-```{r echo=FALSE}
+```{r results='hide', include=TRUE}
 if(!require('pacman')) install.packages('pacman')
-pacman::p_load(httr, rvest, jsonlite, tidyverse)
-
-denullify <- function(lst, fill = NA) {
-  # Обращает пустые вхождения внутри списка в NA
-  # Для того, чтобы можно было объединить элементы списка в датафрейм
-  lapply(lst, function(l) lapply(l, function(x) ifelse(is.null(x), fill, x)))
-}
+pacman::p_load(httr, rvest, jsonlite, tidyverse, getProxy)
 ```
 
 ##Текстовые и неструктурированные данные. 
@@ -25,30 +19,13 @@ denullify <- function(lst, fill = NA) {
 
 ```{r}
 cities <- c('Дербент', 'Великий Новгород', 'Псков', 'Полоцк', 'Козельск')
-.htmlweb_API_KEY <- '211ecf285f865e3b842ddfdc25296c87'
-# city <- character()
-# id <- integer()
 
-# result <- GET(
-#   base_url,
-#   query = list(
-#     city_name = cities[5],
-#     api_key = .htmlweb_API_KEY,
-#     charset = 'utf-8'
-#   )
-# )
-# result
-# content(result)
-# res <- fromJSON(content(result))
-# res$limit <- NULL
-# do.call(rbind, lapply(denullify(res), as.data.frame, stringsAsFactors = FALSE))
-
-# base_url <- 'https://htmlweb.ru/geo/api.php?xml'
-# res <- content(result)
-# res[length(res)] <- NULL
-# res <- xmltools::xml_dig_df(res)
-
-get_cities <- function(cities, api_key = NULL, sleep = 0) {
+get_cities <- function(
+  cities,
+  api_key = NULL,
+  sleep = 0,
+  proxy = NULL
+) {
   cities_df <- data.frame()
   base_url <- 'https://htmlweb.ru/geo/api.php?json'
   for (city in cities) {
@@ -57,40 +34,40 @@ get_cities <- function(cities, api_key = NULL, sleep = 0) {
       base_url,
       query = list(
         city_name = city,
-        api_key = api_key,
+        if (!is.null(api_key)) api_key = api_key,
         charset = 'utf-8'
-      )
+      ),
+      if (!is.null(proxy)) use_proxy(proxy[1], as.numeric(proxy[2]))
     )
     city_df <- content(result)
-    city_df$limit <- NULL # Избавляемся от не-датасета в хвосте списка
-    city_df <- do.call(
-      rbind,
-      lapply(denullify(city_df), as.data.frame, stringsAsFactors = FALSE)
-    )
-    # Забираем первый, самое релевантный результат поиска
-    cities_df <- rbind(cities_df, city_df[1, c('id', 'name', 'country')])
+    city_df <- city_df %>%
+      .[[1]] %>% # Забираем первый, самое релевантный результат поиска
+      .[map_lgl(., ~ length(.) > 0)] %>%
+      as_tibble() %>%
+      select(id, name, country)
+    cities_df <- rbind(cities_df, city_df)
   }
   return(cities_df)
 }
 
-(cities_df <- get_cities(cities, api_key = .htmlweb_API_KEY))
+if (!file.exists('cities5.rds')) {
+  cities_df <- get_cities(cities)
+  write_rds(cities_df, 'cities5.rds', compress = 'gz')
+} else {
+  cities_df <- read_rds('cities5.rds')
+}
 
-# getProxy(country = 'DE', supportsHttps = TRUE, type = 'socks5', action = 'get')
 
-get_cities_distance <- function(id1, id2, api_key = NULL, sleep = 0) {
-  # proxy_countries <- c('RU', 'CA', 'DE', 'FR', 'US', 'NL')
-  # while (!exists('proxy')) {
-  #   try(
-  #     proxy <- getProxy(
-  #       country = sample(proxy_countries, 1),
-  #       supportsHttps = TRUE,
-  #       action = 'get'
-  #     )
-  #   )
-  # }
-  # proxy <- unlist(strsplit(proxy, split = ':'))
+get_cities_distance <- function(
+  id1,
+  id2,
+  api_key = NULL,
+  sleep = 0,
+  proxy = NULL
+) {
+  if (!is.null(proxy)) proxy <- unlist(strsplit(proxy, split = ':'))
   if (length(id1) != 1 | length(id2) != 1) {
-    stop('Argements id1 and id2 must be numeric (or coercible to one) vectors of length 0')
+    stop('id1 и id2 должны быть числовыми векторами длины 1')
   }
   base_url <- 'https://htmlweb.ru/geo/api.php?json'
   Sys.sleep(sleep)
@@ -99,31 +76,47 @@ get_cities_distance <- function(id1, id2, api_key = NULL, sleep = 0) {
     query = list(
       city1 = id1,
       city2 = id2,
-      api_key = api_key,
+      if (!is.null(api_key)) api_key = api_key,
       charset = 'utf-8'
-    )
-    # use_proxy(proxy[1], as.numeric(proxy[2]))
+    ),
+    if (!is.null(proxy)) use_proxy(proxy[1], as.numeric(proxy[2]))
   )
   return(content(result)$distance)
 }
-# get_cities_distance(647, 647) NULL
-# get_cities_distance(647, 1656)
 
 distances_df <- expand.grid(id1 = cities_df$id, id2 = cities_df$id)
+
 # Удаляем повторяющиеся пары городов
 # Сортируя каждую пару по алфавиту и убирая повторяющиеся результаты сортировки
 distances_df <- distances_df[!duplicated(t(apply(distances_df, 1, sort))), ]
+
+proxy_countries <- c('RU') # , 'CA', 'DE', 'FR', 'US', 'NL')
+while (!exists('proxy')) {
+  # Не всегда удается получить прокси с первого раза
+  try(
+    proxy <- getProxy(
+      country = sample(proxy_countries, 1),
+      supportsHttps = TRUE,
+      action = 'get'
+    )
+  )
+}
 # Добавляем расстояние
 # Не знаю, как обойтись без dplyr ((( (зато можно без purrr, но зачем?)
 distances_df <- distances_df %>%
   mutate(
-    distance = map2_dbl( # На вход должен идти вектор длины 1
-      distances_df$id1,
-      distances_df$id2,
+    distance = map2_dbl( # На вход должны идти два вектора длины 1
+      id1,
+      id2,
       ~ if (.x == .y) {
         0
       } else {
-        get_cities_distance(.x, .y, api_key = .htmlweb_API_KEY)
+        get_cities_distance(
+          .x,
+          .y,
+          sleep = sample(seq(.1, 2.4, by = .1), 1),
+          proxy = proxy
+        )
       }
     )
   )
@@ -133,17 +126,19 @@ distances_df <- distances_df %>%
   left_join(cities_df, by = c('id2' = 'id')) %>%
   rename(city2 = name) %>%
   select(-starts_with('country'))
-distances_df
+knitr::kable(distances_df, )
 # Вот в принципе таблица расстояний, но...
 # Вот классическая матрица расстояний
 distances_matrix <- distances_df %>%
   select(-starts_with('id')) %>%
   bind_rows(rename(., city2 = city1, city1 = city2)) %>%
+  # Иначе будет пустой нижний треугольник матрицы, некрасиво
   filter(city1 != city2) %>%
   spread(key = city2, value = distance, fill = 0) %>%
   column_to_rownames('city1') %>%
-  as.matrix()
-distances_matrix
+  as.matrix() %>%
+  .[upper.tri(., diag = TRUE)]
+knitr::kable(distances_matrix)
 ```
 
 *Задание считается выполненным, когда: *
@@ -164,11 +159,11 @@ number_html[13] %>% html_text()
 news <- data.frame(
   header = str_extract(
     html_text(number_html, trim = TRUE),
-    '^.+(?!=\\s\\S{5}$)'
+    '^.+(?!=\\s\\d{2}\\:\\d{2}$)'
   ),
   time = str_extract(
     html_text(number_html, trim = TRUE),
-    '\\S{5}$'
+    '\\d{2}\\:\\d{2}$'
   ),
   stringsAsFactors = FALSE
 )
@@ -181,13 +176,30 @@ knitr::kable(news)
 ```{r}
 set.seed(9)
 #генерируем телефонные номера
-phones<-cbind(79000000000+sample(0:999999999,3,replace=F))%>%as.data.frame()
-JSON<-GET(paste0("https://www.kody.su/api/v2.1/search.json?q=+)",phones$V1[1],"&key=test"))
-xml<-GET(paste0("https://www.kody.su/api/v2.1/search.xml?q=+)",phones$V1[1],"&key=test"))
+phones <- cbind(79000000000+sample(0:999999999,3,replace=F)) %>% as.data.frame()
+
+while (!exists('proxy')) {
+  # Не всегда удается получить прокси с первого раза
+  try(
+    proxy <- getProxy(
+      country = 'RU',
+      supportsHttps = TRUE,
+      action = 'get'
+    )
+  )
+}
+proxy <- unlist(strsplit(proxy, split = ':'))
+
+JSON <- GET(
+  paste0("https://www.kody.su/api/v2.1/search.json?q=+",phones$V1[1],"&key=test"),
+  use_proxy(proxy[1], as.numeric(proxy[2])),
+  verbose()
+)
+xml <- GET(paste0("https://www.kody.su/api/v2.1/search.xml?q=+",phones$V1[1],"&key=test"))
 xml_doc <- read_xml(xml)
 flatxml<-cbind(xml_find_all(xml_doc,"//query")%>%xml_text(),xml_find_all(xml_doc,"//numbers/number/operator")%>%xml_text(),xml_find_all(xml_doc,"//numbers/number/region")%>%xml_text())
 
-flatJSON<-fromJSON(as.character(JSON),simplifyVector = TRUE,flatten = T)
+flatJSON <- fromJSON(as.character(JSON),simplifyVector = TRUE,flatten = T)
 
 ```
 *Задание:* Дополните получение данных в формате JSON так, чтобы получить таблицу Номер -оператор-регион. 
