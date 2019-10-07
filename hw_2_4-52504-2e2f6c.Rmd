@@ -17,7 +17,7 @@ pacman::p_load(httr, rvest, jsonlite, tidyverse, getProxy)
 Для кодирования названий городов можно воспользоваться **htmltools::urlEncodePath()**
 Чтобы обойти счетчик действий для незарегистрированного юзера, можно воспользоваться пакетом **get_proxy()**
 
-```{r}
+```{r error=FALSE}
 cities <- c('Дербент', 'Великий Новгород', 'Псков', 'Полоцк', 'Козельск')
 
 get_cities <- function(
@@ -126,7 +126,7 @@ distances_df <- distances_df %>%
   left_join(cities_df, by = c('id2' = 'id')) %>%
   rename(city2 = name) %>%
   select(-starts_with('country'))
-knitr::kable(distances_df, )
+knitr::kable(distances_df)
 # Вот в принципе таблица расстояний, но...
 # Вот классическая матрица расстояний
 distances_matrix <- distances_df %>%
@@ -136,8 +136,7 @@ distances_matrix <- distances_df %>%
   filter(city1 != city2) %>%
   spread(key = city2, value = distance, fill = 0) %>%
   column_to_rownames('city1') %>%
-  as.matrix() %>%
-  .[upper.tri(., diag = TRUE)]
+  as.matrix()
 knitr::kable(distances_matrix)
 ```
 
@@ -148,7 +147,7 @@ knitr::kable(distances_matrix)
 * Построена матрица расстояний
 
 2. 
-```{r}
+```{r error=FALSE}
 library(httr)
 library(rvest)
 library(stringr)
@@ -173,11 +172,12 @@ knitr::kable(news)
 *Задание:* с помощью функций работы со строками извлеките из списка number_html все статьи и время их появления и сохраните в табличном виде
 
 3.
-```{r}
+```{r error=FALSE}
 set.seed(9)
 #генерируем телефонные номера
 phones <- cbind(79000000000+sample(0:999999999,3,replace=F)) %>% as.data.frame()
 
+rm(proxy)
 while (!exists('proxy')) {
   # Не всегда удается получить прокси с первого раза
   try(
