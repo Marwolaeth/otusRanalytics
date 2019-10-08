@@ -195,8 +195,7 @@ proxy <- unlist(strsplit(proxy, split = ':'))
 
 JSON <- GET(
   paste0("https://www.kody.su/api/v2.1/search.json?q=+",phones$V1[1],"&key=test"),
-  use_proxy(proxy[1], as.numeric(proxy[2])),
-  verbose()
+  use_proxy(proxy[1], as.numeric(proxy[2]))
 )
 xml <- GET(paste0("https://www.kody.su/api/v2.1/search.xml?q=+",phones$V1[1],"&key=test"))
 xml_doc <- read_xml(xml)
@@ -209,27 +208,27 @@ flatxml <- cbind(
 flatJSON <- fromJSON(as.character(JSON), simplifyVector = TRUE, flatten = T)
 
 # Временный фикс из-за недоступности API kody.su (из примера на сайте):
-JSON$temp <- '{
-	"success": true,
-	"query": "79040000000",
-	"quota": 91,
-	"numbers": [{
-		"number_current": "79040000000",
-		"success": true,
-		"number_type": 1,
-		"def": "904",
-		"number": "0000000",
-		"code_start": "0000000",
-		"code_end": "0299999",
-		"operator": "Tele2",
-		"operator_full": "ЗАО Смоленская Сотовая Связь Тверь",
-		"region": "Тверская область",
-		"time": "3.0",
-		"bdpn": false,
-		"bdpn_operator": ""
-	}]
-}'
-flatJSON <- fromJSON(JSON$temp, simplifyVector = TRUE, flatten = T)
+# JSON$temp <- '{
+# 	"success": true,
+# 	"query": "79040000000",
+# 	"quota": 91,
+# 	"numbers": [{
+# 		"number_current": "79040000000",
+# 		"success": true,
+# 		"number_type": 1,
+# 		"def": "904",
+# 		"number": "0000000",
+# 		"code_start": "0000000",
+# 		"code_end": "0299999",
+# 		"operator": "Tele2",
+# 		"operator_full": "ЗАО Смоленская Сотовая Связь Тверь",
+# 		"region": "Тверская область",
+# 		"time": "3.0",
+# 		"bdpn": false,
+# 		"bdpn_operator": ""
+# 	}]
+# }'
+# flatJSON <- fromJSON(JSON$temp, simplifyVector = TRUE, flatten = T)
 # str(flatJSON)
 (flatJSON <- flatJSON$numbers[, c('number_current', 'operator', 'region')])
 ```
