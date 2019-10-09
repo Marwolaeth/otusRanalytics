@@ -163,17 +163,37 @@ plot(consent,
 ```{r eval=FALSE}
 body(Quandl)
 # Quandl() → Quandl.dataset.get()
-args(Quandl.dataset.get)
-body(Quandl.dataset.get)
+Quandl::Quandl.dataset.get
 # Quandl() → Quandl.dataset.get() → quandl.api()
+Quandl::quandl.api
+getAnywhere('VERB')
+getAnywhere('quandl.api.build_request')
+# Quandl() → Quandl.dataset.get() → quandl.api() →
+# httr::VERB() → quandl.api.build_request()
 ```
+
+*Функция `Quandl()` вызывает функцию `Quandl.dataset.get()`, а затем обрабатывает полученные данные в соответствии со своими аргументами. `Quandl.dataset.get()` получает на вход код набора данных Quandl и обрабатывает датафрейм — результат вызова `quandl.api()`, которой подает путь к набору данных на сайте Quandl и дополнительный параметры. `quandl.api()` формирует запрос к серверу Quandl с помощью скрытой функции `quandl.api.build_request()`, отправляет его с помощью `httr::VERB()`, преобразует ответ из JSON в датафрейм и возвращает в `Quandl.dataset.get()`
 
 * На занятии мы столкнулись со случаем, когда функция, вызываемая в функции пакета (на занятии это была функция из пакета fredr), не может быть вызвана нами самостоятельно. В этом случае функция, на самом деле, по-прежнему существует, просто находится в другом окружении. Такие "тайно запрятанные" функции можно найти через `Quandl:::FUNC_NAME()`.
 
 Для своего запроса попробуйте вывести текст `request`, который идёт на сервер Quandl. Для этого Вам нужно найти функцию, генерирующую этот запрос, понять, какие данные она принимает на вход и проверить эту функцию на своих данных ввода. (Подсказка - функция скрытая)
 
 ```{r}
-# Ваш код
+request <- Quandl:::quandl.api.build_request(
+  paste('datasets', consent_code, sep = '/')
+)
+# Воспроизводим работу Quandl::quandl.api()
+response <- httr::GET(
+  request$request_url,
+  config = do.call(httr::add_headers, request$headers)
+)
+data <- jsonlite::fromJSON(
+  httr::content(response, as = 'text'),
+  simplifyVector = TRUE
+)
+str(data, 1)
+str(data, 2)           # Вышестоящая функция обрабатывает именно список "dataset"
+str(data$dataset$data) # Набор данных возвращаются в виде символьной матрицы
 ```
 
 # 3
@@ -199,12 +219,12 @@ body(Quandl.dataset.get)
 
 После сдачи дз приложение можно удалить - токен больше не будет активен (вообще он активен в течение 1 суток).
 
-```{r}
-# .MY_VK_OAUTH <- "ID приложения"
-# vkOAuth(.MY_VK_OAUTH)
+```{r echo=FALSE}
+.MY_VK_OAUTH <- 5573604
+vkOAuth(.MY_VK_OAUTH)
 
-# .MY_VK_TOKEN <- "Ваш токен"
-# setAccessToken(access_token = .MY_VK_TOKEN)
+.MY_VK_TOKEN <- 'c7710821ca66a836d183333f6900e7f75a3109f91f095d2265810861704310596843d7393008bb5e20cd3'
+setAccessToken(access_token = .MY_VK_TOKEN)
 ```
 
 Задание:
@@ -212,10 +232,13 @@ body(Quandl.dataset.get)
 * Получить список друзей
 * Для каждого друга получить список пабликов, на которые он(а) подписаны. (функция `getGroups()`, для самих групп нужно выбрать $items). Так как у некоторых друзей паблики скрыты настройками приватности, VK API выдаст ошибку при попытке получить паблики данных пользователей. Для этого нужно "поймать ошибку", чтобы код продолжал работать. В целом это отдельная большая тема, поэтому вот готовая функция поиска групп для 1 пользователя, обернутая в `map()`:
 
-```{r eval=FALSE}
+```{r}
+friends_df <- getFriends(fields = 'sex,bdate')$items
+
 friends_groups <- map(friends_df$id, 
     function(x) {tryCatch(getGroups(user_id = x, extended = 1)$items$name,
            error = function(e) {NULL})})
+# str(friends_groups, 1)
 ```
 
 * Сделать агрегирующую таблицу (паблик - сколько друзей подписано)
