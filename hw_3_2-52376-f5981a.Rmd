@@ -1,12 +1,14 @@
 ---
 title: "hw_3_1"
-author: "Бикмаев Руслан"
+author: "Бикмаев Руслан, Андрей Павлюченко"
 date: "08 10 2019"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+if(!require('pacman')) install.packages('pacman')
+pacman::p_load(data.table, microbenchmark)
 ```
 ## ДЗ 2.1 data.table - ключи и модификация по ссылке
 
@@ -28,6 +30,30 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Если не получится очистить данные (вторая колонка останется в виде "NOUN,inan,masc sing,accs"), можно провести последующие измерения на "полуочищенных" данных.
 
+```{r}
+if (!file.exists('dict.opcorpora.txt')) {
+  if (!file.exists('dict.opcorpora.txt.zip')) {
+    download.file(
+      'http://opencorpora.org/files/export/dict/dict.opcorpora.txt.zip',
+      destfile = 'dict.opcorpora.txt.zip'
+    ) 
+  }
+  unzip('dict.opcorpora.txt.zip')
+}
+oc <- fread(
+  'grep -v ^[0-9] dict.opcorpora.txt',
+  encoding = 'UTF-8',
+  header = FALSE,
+  sep = '\t',
+  sep2 = ',',
+  blank.lines.skip = TRUE
+)
+oc
+
+oc[, V2 := gsub('(^[A-Z]{4}).+', '\\1', V2)]
+oc
+```
+
 
 2. Создайте глубокую копию словаря и сохраните её во вторую переменную.
 
@@ -35,6 +61,23 @@ knitr::opts_chunk$set(echo = TRUE)
 Измерьте c помощью microbenchmark() скорость поиска по произвольному слову (напр. "ЁЖИКОВ") в обоих вариантах (key, index)
 Код и результаты измерений впишите в ДЗ.
 Вопросы можно обсудить в чате.
+
+```{r}
+oc2 <- copy(oc)
+setkey(oc, V1)
+str(oc)
+setindex(oc2, V1)
+str(oc2)
+
+set.seed(1111)
+oc[sample(1:.N, size = 1)] # НЕИСПРАВЛЕННОГО
+
+microbenchmark(
+  key   = oc[V1 == 'НЕИСПРАВЛЕННОГО', V2],
+  index = oc2[V1== 'НЕИСПРАВЛЕННОГО', V2],
+  times = 100L
+)
+```
 
 
 Желательно сдать домашнее задание до 23:59 13.10.2019 г.
