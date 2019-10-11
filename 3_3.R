@@ -27,6 +27,12 @@ DT.m2 = melt(DT, id.vars = c("family_id", "age_mother"),
              value.name = 'dob')
 DT.m2
 
+DT.m2 = melt(DT, id.vars = c("family_id", "age_mother"), 
+             measure.vars = grep('child', names(DT)),
+             variable.name = 'child',
+             value.name = 'dob')
+DT.m2
+
 ############## dcast ############################################################################
 # переформатирование из “длинного” формата в “широкий"
 ## 
@@ -44,6 +50,31 @@ dcast(DT, diet+chick ~ time, drop=FALSE, fill=0)
 
 # using subset
 dcast(DT, chick ~ time, fun=mean, subset=.(time < 10 & chick < 20))
+
+set.seed(1111)
+DT <- data.table(
+  measure_id = 111:125,
+  group = rep(LETTERS[1:5], each = 3),
+  measure = rep(
+    sort(
+      paste0(
+        replicate(
+          3,
+          paste(
+            sample(letters[1:20], sample(3:5)),
+            collapse = ''
+          )
+        ),
+        replicate(3, sample(2:5, size= 1))
+      )
+    ),
+    5
+  ),
+  value = rnorm(15, mean = 10, sd = 4)
+)
+DT
+
+dcast(DT, group ~ measure)
 #########################################################################################
 #########################################################################################
 

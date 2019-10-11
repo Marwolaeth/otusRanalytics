@@ -1,7 +1,7 @@
 ---
-title: "hw_3_1"
+title: "hw_3_2"
 author: "Бикмаев Руслан, Андрей Павлюченко"
-date: "08 10 2019"
+date: "11.10.2019"
 output: html_document
 ---
 
@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 if(!require('pacman')) install.packages('pacman')
 pacman::p_load(data.table, microbenchmark)
 ```
-## ДЗ 2.1 data.table - ключи и модификация по ссылке
+## ДЗ 3.1 data.table - ключи и модификация по ссылке
 
 1. Для упражнения используются данные морфологического словаря, скаченного на одном из прошлых занятий.   
 [ссылка.zip](http://opencorpora.org/files/export/dict/dict.opcorpora.txt.zip)  
@@ -22,11 +22,13 @@ pacman::p_load(data.table, microbenchmark)
 То есть выбор способа чистки данных произвольный. 
 
 Пример:
-          V1     V2
- 1:       ЁЖ   NOUN     
- 2:      ЕЖА   NOUN      
- 3:      ЕЖУ   NOUN     
- 4:      ЕЖА   NOUN          
+
+|    | V1  | V2   |
+|----|-----|------|
+| 1: | ЁЖ  | NOUN |
+| 2: | ЕЖА | NOUN |
+| 3: | ЕЖУ | NOUN |
+| 4: | ЕЖА | NOUN |         
 
 Если не получится очистить данные (вторая колонка останется в виде "NOUN,inan,masc sing,accs"), можно провести последующие измерения на "полуочищенных" данных.
 
@@ -70,11 +72,11 @@ setindex(oc2, V1)
 str(oc2)
 
 set.seed(1111)
-oc[sample(1:.N, size = 1)] # НЕИСПРАВЛЕННОГО
+oc[sample(1:.N, size = 1)] # НЕИСТЕКШИХ
 
 microbenchmark(
-  key   = oc[V1 == 'НЕИСПРАВЛЕННОГО', V2],
-  index = oc2[V1== 'НЕИСПРАВЛЕННОГО', V2],
+  key   = oc[V1 == 'НЕИСТЕКШИХ', V2],
+  index = oc2[V1== 'НЕИСТЕКШИХ', V2],
   times = 100L
 )
 ```
