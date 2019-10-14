@@ -24,17 +24,73 @@ pacman::p_load(data.table, microbenchmark)
 ```{r}
 
 so <- fread('so.csv', encoding = 'UTF-8')
-so_long <- so[, .(from = V1, quote_from = V5)]
+so_long <- copy(so)
+so_long <- so_long[, .(from = V1, quote_from = V5)]
 so_long
 # all.equal(so_long$quote_from, so$V5)
 so[, lapply(.SD, uniqueN)] # 6234 уникальных процитированных пользователей???
 
+# ?Что здесь творится?
+so_long[, .(.N, charlen = nchar(quote_from)), by = quote_from][
+  order(-charlen)
+]
+summary(nchar(so_long[quote_from != '', quote_from]))
+
+# Кажется, среди имен процитированных пользователей есть фрагменты текста
+so_long[, .(.N, charlen = nchar(quote_from)), by = quote_from][
+  order(-charlen)
+][
+  charlen > 10
+][1:50]
+
+# Попытка почистить переменную от фрагментов текста
+# ?Могут ли цитировать авторов, которые не оставляли сообщений?
+# ?Или в данном наборе не все сообщения, которые можно цитировать?
+# Предположим, что все авторы есть в переменной "from"
+so_long_clean <- copy(so_long)
+# Забираем только посты с цитатами
+# Где цитируемый пользователь — один из авторов сообщений
+so_long_clean <- so_long_clean[(quote_from %chin% from) & (from != '')]
+summary(nchar(so_long_clean[quote_from != '', quote_from]))
+# Так лучше
+```
+
+```{r eval=FALSE, include=FALSE}
+# Черновик
+# Тренировка
+df <- data.table(
+  x = rep(LETTERS[1:6], 2),
+  y = c(NA, LETTERS[1:5], LETTERS[5:1], NA)
+)
+df
+
+dcast(df, x ~ y)                  # Нет
+dcast(df, x ~ y, value.var = 'x') # Да
+dcast(df, . ~ y, value.var = 'x') # Нет
+rm(df)
+```
+
+```{r}
+so_long_clean[quote_from == '', quote_from := NA]
+
 so_wide <- dcast(
-  so_long,
+  so_long_clean,
   from ~ quote_from,
   value.var = 'from',
-  fun.aggregate = function(x) max(x)
+  fun.aggregate = function(x) max(x, na.rm = TRUE)
 )
+so_wide[1:20, 1:15]
+
+# Посмотрим на самых цитируемых авторах
+most_quoted <- so_long_clean[
+  !is.na(quote_from), .N, by = quote_from][
+    order(-N)
+  ][
+    1:40,
+    quote_from
+  ]
+so_wide[from %chin% most_quoted][1:40, 1:10]
+# Похоже на правду
 ```
 
 

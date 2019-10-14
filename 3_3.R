@@ -249,3 +249,13 @@ cubed2
 
 # через dcast()в широком формате
 dcast(cubed2, month + carrier ~ origin,  value.var = "distance")
+
+#############
+df <- data.table(
+  x = rep(LETTERS[1:6], 2),
+  y = c(NA, LETTERS[1:5], LETTERS[5:1], NA)
+)
+df
+
+dcast(df, x ~ y, value.var = 'x')
+dcast(df, . ~ y, value.var = 'x', fun.aggregate = )
