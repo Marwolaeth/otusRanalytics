@@ -29,6 +29,7 @@ so_long <- so_long[, .(from = V1, quote_from = V5)]
 so_long
 # all.equal(so_long$quote_from, so$V5)
 so[, lapply(.SD, uniqueN)] # 6234 уникальных процитированных пользователей???
+rm(so)
 
 # ?Что здесь творится?
 so_long[, .(.N, charlen = nchar(quote_from)), by = quote_from][
@@ -53,6 +54,8 @@ so_long_clean <- copy(so_long)
 so_long_clean <- so_long_clean[(quote_from %chin% from) & (from != '')]
 summary(nchar(so_long_clean[quote_from != '', quote_from]))
 # Так лучше
+
+rm(so_long)
 ```
 
 ```{r eval=FALSE, include=FALSE}
@@ -79,7 +82,7 @@ so_wide <- dcast(
   value.var = 'from',
   fun.aggregate = function(x) max(x, na.rm = TRUE)
 )
-so_wide[1:20, 1:15]
+so_wide[1:20, 1:7]
 
 # Посмотрим на самых цитируемых авторах
 most_quoted <- so_long_clean[
@@ -89,8 +92,32 @@ most_quoted <- so_long_clean[
     1:40,
     quote_from
   ]
-so_wide[from %chin% most_quoted][1:40, 1:10]
+so_wide[from %chin% most_quoted, -c('NA')][1:40, 1:5] # Без столбца NA
 # Похоже на правду
+```
+
+```{r}
+so_key <- copy(so_long_clean)
+setkey(so_key, from)
+
+so_index <- copy(so_long_clean)
+setindex(so_index, from)
+
+spread_names <- function(dt) {
+  dcast(
+    dt,
+    from ~ quote_from,
+    value.var = 'from',
+    fun.aggregate = function(x) max(x, na.rm = TRUE)
+  )
+}
+
+microbenchmark(
+  key   = spread_names(so_key),
+  index = spread_names(so_index),
+  times = 100L
+)
+# key быстрее
 ```
 
 
@@ -98,6 +125,7 @@ so_wide[from %chin% most_quoted][1:40, 1:10]
 Желательно сдать домашнее задание до 23:59 13.10.2019 г.
 
 **Задание считается выполненным, когда:**
+
  * Домашняя работа сдана (1 балл)
  * Измерения проведены корректно, описание подробное (1 балл)
  * Код оформлен согласно рекомендациям tidyverse (1 балл)
@@ -105,6 +133,7 @@ so_wide[from %chin% most_quoted][1:40, 1:10]
  
 
 **Дополнительные баллы:**
+
 * Произведено измерение влияния ключей и индексов (1 балл)
  
 **Минимальное количество баллов для зачета - 4**
