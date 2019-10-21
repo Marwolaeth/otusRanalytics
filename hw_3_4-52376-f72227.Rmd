@@ -1,0 +1,98 @@
+---
+title: "hw_3_3"
+author: "Бикмаев Руслан"
+date: "10 10 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## ДЗ 3.3
+
+ Для упражнения используются  данные so.csv, прекрепленные к материалам прошлого урока
+1. Загрузите данные.
+2. Произведите необходимые преобразования.
+3. Вычислите временной промежуток в днях (число дней) с первого по последний пост пользователя "Шелест", либо любого на ваш выбор.
+
+```{r message=FALSE, results='hide'}
+if(!require('pacman')) install.packages('pacman')
+pacman::p_load(data.table)
+```
+
+```{r}
+so <- fread('so.csv', encoding = 'UTF-8')
+so_ind <- copy(so)
+setnames(
+  so,
+  c('user', 'usid', 'postid', 'date', 'quoter', 'text', 'url', 'id', '')
+)
+
+so[, c('') := NULL]
+str(so)
+```
+
+```{r}
+so[, created := {date = gsub('pm\\s*$', 'пополудни', date)
+  # date = gsub(' am\\s*$', '', date) # это лишнее: as.POSIXct распознает "am"
+  date = gsub('^\\s+', '', date)
+  date = gsub('\\s{2,}', ' ', date)
+  date = gsub('\\s+$', '', date)
+  date = as.POSIXct(
+    date,
+    tz = 'Europe/Moscow',
+    format = '%a %b %d, %Y %I:%M %p'
+  )
+},
+]
+
+str(so)
+summary(so)
+
+so[is.na(created), .(user, date, quoter, created)]
+x <- so[is.na(created), date]
+head(x, 80)
+(x <- x[1:80])
+as.POSIXct(
+    x,
+    tz = 'Europe/Moscow',
+    format = '%a %b %d, %Y %I:%M %p'
+  )
+(x <- gsub('pm\\s*$', 'пополудни', x))
+(x <- gsub('am\\s*$', '', x))
+(x <- gsub('^\\s+', '', x))
+(x <- gsub('\\s+$', '', x))
+```
+
+```{r}
+so[, created := {date = gsub('pm\\s*$', 'пополудни', date)
+  # date = gsub(' am\\s*$', '', date) # это лишнее: as.POSIXct распознает "am"
+  date = gsub('^\\s+', '', date)
+  date = gsub('\\s{2,}', ' ', date)
+  date = gsub('\\s+$', '', date)
+  date = as.POSIXct(
+    date,
+    tz = 'UTC',
+    format = '%a %b %d, %Y %I:%M %p'
+  )
+},
+]
+
+str(so)
+summary(so)
+```
+
+Желательно сдать домашнее задание до 23:59 20.10.2019 г.
+
+**Задание считается выполненным, когда:**
+ * Домашняя работа сдана (1 балл)
+ * Измерения проведены корректно, описание подробное (1 балл)
+ * Код оформлен согласно рекомендациям tidyverse (1 балл)
+ * Произведено вычисление временного периода (1 балла)
+ 
+
+**Дополнительные баллы:**
+* Вычисление временного периода произведено  правильно (1 балл) 
+ 
+**Минимальное количество баллов для зачета - 4**
+

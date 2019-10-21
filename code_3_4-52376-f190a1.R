@@ -199,7 +199,7 @@ as.Date.character(" Пн май 02, 2016 1:17 pm ", " %a %b %d, %Y %I:%M %p ")
 as.Date.character(" Пн мая 02, 2016 1:17 pm ", " %a %b %d, %Y %I:%M %p ")
 # [1] "2016-05-02"
 
-lubridate::dmy_hm(" Пн мая 02, 2016 1:17 pm ")
+lubridate::dmy_hm(" Пн май 02, 2016 1:17 pm ")
 
 
 ### возможные варианты приведение данных в читаемый вид просьба сбросить в чат
@@ -215,6 +215,97 @@ lubridate::dmy_hm(" Пн мая 02, 2016 1:17 pm ")
 
 # POSIXct проще обрабатывать, так как структура списка даты в POSIXlt может быть проблематичной
 # и POSIXct занимает немного меньше памяти
+
+x <- c('February 20th 1973',
+       "february  14, 2004",
+       "Sunday, May 1, 2000",
+       "Sunday, May 1, 2000",
+       "february  14, 04",
+       'Feb 20th 73',
+       "January 5 1999 at 7pm",
+       "jan 3 2010",
+       "Jan 1, 1999",
+       "jan 3   10",
+       "01 3 2010",
+       "1 3 10",
+       '1 13 89',
+       "5/27/1979",
+       "12/31/99",
+       "DOB:12/11/00",
+       "-----------",
+       'Thu, 1 July 2004 22:30:00',
+       'Thu, 1st of July 2004 at 22:30:00',
+       'Thu, 1July 2004 at 22:30:00',
+       'Thu, 1July2004 22:30:00',
+       'Thu, 1July04 22:30:00',
+       "21 Aug 2011, 11:15:34 pm",
+       "-----------",
+       "1979-05-27 05:00:59",
+       "1979-05-27",
+       "-----------",
+       "3 jan 2000",
+       "17 april 85",
+       "27/5/1979",
+       '20 01 89',
+       '00/13/10',
+       "-------",
+       "14 12 00",
+       "03:23:22 pm")
+
+lubridate::guess_formats(x, "BdY")
+lubridate::guess_formats(x, "Bdy")
+## m also matches b and B; y also matches Y
+lubridate::guess_formats(x, "mdy", print_matches = TRUE)
+
+## T also matches IMSp order
+lubridate::guess_formats(x, "T", print_matches = TRUE)
+
+## b and B are equivalent and match, both, abreviated and full names
+lubridate::guess_formats(x, c("mdY", "BdY", "Bdy", "bdY", "bdy"), print_matches = TRUE)
+lubridate::guess_formats(x, c("dmy", "dbY", "dBy", "dBY"), print_matches = TRUE)
+
+
+lubridate::guess_formats(x, c("dBY HMS", "dbY HMS", "dmyHMS", "BdY H"), print_matches = TRUE)
+
+lubridate::guess_formats(x, c("ymd HMS"), print_matches = TRUE)
+
+
+as.POSIXct(
+  gsub('^\\s*[А-Я][а-я]+?\\s+', '', " Пн мар 28, 2016 3:38 pm "),
+  tz = 'Europe/Moscow',
+  format = '%b %d, %Y %OI:%M %p '
+)
+
+as.POSIXct(
+  " Пн мар 28, 2016 3:38 pm ",
+  tz = 'Europe/Moscow',
+  format = ' %a %b %d, %Y %I:%M %p '
+)
+
+lubridate::stamp('Пн мар 28, 2016 3:38 pm')(Sys.time())
+
+format(Sys.time(), format = ' %a %b %d, %Y %I:%M %p ')
+
+format(Sys.time() - 4*60*60, format = ' %a %b %d, %Y %I:%M %p ')
+
+strptime(" Пн мар 28, 2016 3:38 пополудни ", format = ' %a %b %d, %Y %I:%M %p ')
+strptime(" Пн мар 28, 2016 3:38 am ", format = ' %a %b %d, %Y %I:%M %p ')
+
+strptime("Вс мар 27, 2011 2:26 am", format = '%a %b %d, %Y %I:%M %p')
+
+as.POSIXct("Вс мар 27, 2011 2:26 утра", format = '%a %b %d, %Y %I:%M %p')
+
+format(as.POSIXct('2011-03-27 11:22 am'), format = '%a %b %d, %Y %I:%M %p')
+
+
+as.POSIXct(" Вс мар 27, 2011 2:26 am ", format = ' %a %b %d, %Y %I:%M ')
+as.POSIXct(" Вс мар 27, 2011 2:26 am", format = " %a %b %d, %Y %I:%M %p")
+as.Date(" Вс мар 27, 2011 02:26 ", format = " %a %b %d, %Y %H:%M ")
+
+# " Вс мар 27, 2011 2:26 am "
+
+as.POSIXct(" Вс мар 27, 2011 2:00 ", format = " %a %b %d, %Y %H:%M ", tz = 'Europe/Moscow')
+####################################################################
 
 
 datetime <- Sys.time()
