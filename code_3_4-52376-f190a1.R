@@ -290,6 +290,7 @@ format(Sys.time() - 4*60*60, format = ' %a %b %d, %Y %I:%M %p ')
 
 strptime(" Пн мар 28, 2016 3:38 пополудни ", format = ' %a %b %d, %Y %I:%M %p ')
 strptime(" Пн мар 28, 2016 3:38 am ", format = ' %a %b %d, %Y %I:%M %p ')
+strptime(" Пн мар 28, 2016 3:38 pm ", format = ' %a %b %d, %Y %I:%M %p ')
 
 strptime("Вс мар 27, 2011 2:26 am", format = '%a %b %d, %Y %I:%M %p')
 

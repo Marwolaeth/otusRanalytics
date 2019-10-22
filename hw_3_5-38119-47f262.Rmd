@@ -1,0 +1,72 @@
+---
+title: "ДЗ 3.5. dplyr"
+author: "Катин Алексей"
+date: "10 17 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+if(!require('pacman')) install.packages('pacman')
+pacman::p_load(dplyr)
+```
+
+1. Загрузите пакет `babynames`. Расположите имена в порядке убывания популярности для 1989 года.
+
+```{r}
+if (!require(babynames)) install.packages('babynames')
+library(babynames)
+names(babynames)
+str(babynames)
+head(babynames)
+
+babynames %>%
+  filter(year == 1989) %>%
+  arrange(desc(n)) %>%
+  slice(1:20) %>%
+  knitr::kable()
+```
+
+2. Загрузите пакет `nasaweather`. Для данных storms найдите ураганы (hurricanes) в 1999 году и расположите их в порядке убывания скорости ветра. При этом скорость ветра должна быть в метрах в секунду.
+
+```{r}
+if (!require(nasaweather)) install.packages('nasaweather')
+library(nasaweather)
+names(storms)
+str(storms)
+head(storms)
+# ?nasaweather::storms # Скорость ветра в узлах (морских милях в час)
+storms %>%             # 1 узел ≈ 0,51444445 м/с
+  mutate(wind_ms = wind * 0.51444445) %>%
+  filter(type == 'Hurricane' & year == 1999) %>%
+  arrange(desc(wind_ms)) %>%
+  select(-wind) %>%
+  slice(1:20) %>%
+  knitr::kable(digits = 2)
+```
+
+3. Для `nasaweather::atmos` найдите среднюю разницу по месяцам между температурой на поверхности земли и температурой воздуха в период с 1997 по 1999 год для широт в диапазоне (-10;10) и долготы в диапазоне (-90;90).
+
+```{r}
+names(atmos)
+str(atmos)
+head(atmos)
+atmos %>%
+  filter(
+    lat  > -10 & lat  < 10,
+    long > -90 & long < 90,
+    year %in% 1997L:1999L
+  ) %>%
+  mutate(tempdiff = surftemp - temp) %>%
+  group_by(month) %>%
+  summarise(mean_tempdiff = mean(tempdiff)) %>%
+  knitr::kable(digits = 2)
+```
+
+4. Для `nycflights13::flights` расположить компании по возрастанию медианной задержки рейсов. Узнать название компании с самой долгой медианной задержкой рейсов объединив с `nycflights13::airlines`.
+
+5. Для `nycflights13::flights` посчитать среднюю задержку рейсов для каждого дня в году и сохранить в  `daily_delays`.
+
+6. Для `nycflights13::weather` посчитать среднюю ежедневную температуру и сохранить в дф `mean_temp`.
+
+7. Объединить `daily_delays` и `mean_temp` и визуализировать зависимость средней задержки от средней температуры (можно использовать ggplot2, либо базовую графику R).
