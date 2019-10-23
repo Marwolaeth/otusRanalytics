@@ -8,14 +8,12 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 if(!require('pacman')) install.packages('pacman')
-pacman::p_load(dplyr)
+pacman::p_load(tidyverse, babynames, nasaweather, nycflights13)
 ```
 
 1. Загрузите пакет `babynames`. Расположите имена в порядке убывания популярности для 1989 года.
 
 ```{r}
-if (!require(babynames)) install.packages('babynames')
-library(babynames)
 names(babynames)
 str(babynames)
 head(babynames)
@@ -30,8 +28,6 @@ babynames %>%
 2. Загрузите пакет `nasaweather`. Для данных storms найдите ураганы (hurricanes) в 1999 году и расположите их в порядке убывания скорости ветра. При этом скорость ветра должна быть в метрах в секунду.
 
 ```{r}
-if (!require(nasaweather)) install.packages('nasaweather')
-library(nasaweather)
 names(storms)
 str(storms)
 head(storms)
@@ -65,8 +61,54 @@ atmos %>%
 
 4. Для `nycflights13::flights` расположить компании по возрастанию медианной задержки рейсов. Узнать название компании с самой долгой медианной задержкой рейсов объединив с `nycflights13::airlines`.
 
+```{r}
+flights <- nycflights13::flights
+airlines <- nycflights13::airlines
+str(flights)
+str(airlines)
+delays <- flights %>%
+  group_by(carrier) %>%
+  summarise(median_dep_delay = median(dep_delay, na.rm = TRUE)) %>%
+  left_join(airlines) %>%
+  arrange(median_dep_delay)
+
+knitr::kable(delays, digits = 2)  # Кажется, рейсы чаще вылетали раньше времени
+slice(delays, n()) %>% pull(name) # Southwest Airlines Co.
+```
+
 5. Для `nycflights13::flights` посчитать среднюю задержку рейсов для каждого дня в году и сохранить в  `daily_delays`.
+
+```{r}
+str(flights)
+daily_delays <- flights %>%
+  group_by(month, day) %>%
+  summarise(delay = mean(dep_delay, na.rm = TRUE))
+
+knitr::kable(head(daily_delays, 10), digits = 2)
+```
 
 6. Для `nycflights13::weather` посчитать среднюю ежедневную температуру и сохранить в дф `mean_temp`.
 
+```{r}
+weather <- nycflights13::weather
+str(weather)
+mean_temp <- weather %>%
+  group_by(month, day) %>%
+  summarise(temp = mean(temp, na.rm = TRUE))
+
+knitr::kable(head(mean_temp, 10), digits = 2)
+```
+
 7. Объединить `daily_delays` и `mean_temp` и визуализировать зависимость средней задержки от средней температуры (можно использовать ggplot2, либо базовую графику R).
+
+```{r}
+delay_temp <- daily_delays %>%
+  inner_join(mean_temp)
+knitr::kable(head(delay_temp, 10), digits = 2)
+
+ggplot2::ggplot(
+  data = delay_temp,
+  ggplot2::aes(x = temp, y = delay)
+) +
+  ggplot2::geom_point()
+```
