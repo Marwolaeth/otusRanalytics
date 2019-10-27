@@ -1,0 +1,163 @@
+---
+title: "ДЗ 4.1. ggplot-1"
+author: "Катин Алексей"
+date: "10 22 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+if(!require('pacman')) install.packages('pacman')
+pacman::p_load(
+  tidyverse,
+  RColorBrewer,
+  gapminder,
+  ggplot2movies,
+  carData,
+  Hmisc
+)
+```
+
+1. Используя кроссплот отобразить зависимость petal length от sepal length для `iris`, выделив разные виды (species) отдельным цветом и значком. Цвета подобрать из палитр, которая подходит как для дальтоников, так и отличима при черно-белой печати. 
+Ресурсы: http://colorbrewer2.org,
+http://www.sthda.com/english/wiki/ggplot2-colors-how-to-change-colors-automatically-and-manually
+
+```{r}
+# display.brewer.all(3, type = 'qual', colorblindFriendly = TRUE)
+# http://colorbrewer2.org/#type=qualitative&scheme=Set2&n=3
+# each of the palettes is both colorblind-friendly and print-friendly
+# brewer.pal(3, 'Dark2')
+pals <- brewer.pal.info %>%
+  rownames_to_column('name') %>%
+  filter(category == 'qual' & colorblind) %>%
+  # slice(1) %>%
+  pull(name)
+
+ggplot(
+  iris,
+  aes(
+    x = Sepal.Length,
+    y = Petal.Length,
+    colour = Species,
+    shape  = Species
+  )
+) +
+  geom_point(position = 'jitter') +
+  theme_minimal() +
+  scale_colour_brewer(palette = pals[1])
+```
+
+2. Изобразить распределение sepal length для `iris`, выделив разные виды (species) отдельным цветом, добавив прозрачности, чтобы их можно было видеть друг за другом. Выберите другую палитру тоже для дальтоников.
+https://ggplot2.tidyverse.org/reference/geom_density.html
+
+```{r}
+ggplot(iris, aes(x = Sepal.Length, fill = Species)) +
+  geom_density(alpha = .5) +
+  theme_minimal() +
+  scale_fill_brewer(palette = pals[2])
+```
+
+3. Для `gapminder` (установить пакет) узнать и визуализировать изменение по годам медианы продолжительности жизни (lifeExp), выделив отдельным цветом и разным видом линий временные ряды для каждого континента (continent). Выберите другую палитру на ваш вкус.
+https://ggplot2.tidyverse.org/reference/aes_linetype_size_shape.html
+
+```{r}
+str(gapminder)
+gapminder::continent_colors
+gapminder %>%
+  group_by(year, continent) %>%
+  summarise(medLifeExp = median(lifeExp, na.rm = TRUE)) %>%
+  ungroup() %>%
+  ggplot(
+    aes(
+      x = year,
+      y = medLifeExp,
+      colour = continent,
+      linetype = continent
+    )
+  ) +
+  geom_line(lwd = 1) +
+  theme_minimal() +
+  scale_colour_manual(values = continent_colors)
+```
+
+4. Для пакета `ggplot2movies` (установить пакет) визуализировать как барчарт динамику изменения среднегодового бюджета на фильм.
+
+```{r}
+ggplot2movies::movies %>%
+  group_by(year) %>%
+  summarise(avg_budget = mean(budget, na.rm = TRUE)) %>%
+  filter(year >= 1970) %>% # Иначе слишком много значений
+  mutate(year = factor(year)) %>%
+  ggplot(aes(x = year, y = avg_budget)) +
+  geom_col(width = .7, fill = 'darkgrey') +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+5. Для `gapminder` узнать и визуализировать минимальный и максимальные ВВП (gdpPercap) для каждого континента (continent), визуализировать в виде барчарта, выделив отдельным цветом минимальный и максимальный. Выберите другую палитру на ваш вкус.
+
+```{r}
+gapminder %>%
+  filter(year == last(unique(year))) %>% # Сравниваем ВВП для одного периода
+  group_by(continent) %>%
+  summarise(
+    min = min(gdpPercap, na.rm = TRUE),
+    max = max(gdpPercap, na.rm = TRUE)
+  ) %>%
+  gather('rank', 'gdp', -continent, factor_key = TRUE) %>%
+  ggplot(aes(x = continent, y = gdp, fill = rank)) +
+  geom_col(
+    position = position_dodge2(
+      width = .9, padding = .1
+    )
+  ) +
+  scale_y_continuous('GDP per capita') +
+  scale_fill_brewer('Rank', palette = pals[2]) +
+  theme_minimal()
+```
+
+6. Для данных `carData::Salaries` в свободной форме
+а) выяснить есть ли различия в зарплатах женщин и мужчин в зависимости от должности (ранга)
+б) показать как зарплата зависит от количества лет после получения степени, в зависимости от дисциплины.
+
+```{r}
+str(Salaries)
+summary(Salaries)
+# https://academia.stackexchange.com/a/2537 for university hierarchy
+salaries <- as_tibble(mutate(Salaries, rank = factor(rank, ordered = TRUE)))
+head(salaries$rank)
+
+# a)
+ggplot(salaries, aes(x = rank, y = salary, colour = sex)) +
+  geom_jitter(alpha = .5, position = position_jitterdodge(jitter.width = .2)) +
+  scale_colour_brewer(palette = pals[3]) +
+  stat_summary(
+    mapping = aes(group = sex),
+    fun.y = median,
+    geom = 'point',
+    shape = 18,
+    size = 3,
+    position = position_dodge(width = .2)
+  ) +
+  stat_summary(
+    mapping = aes(group = sex),
+    fun.data = median_hilow,
+    geom = 'errorbar',
+    width = .2,
+    lwd = 1,
+    position = 'dodge'
+  ) +
+  theme_minimal()
+
+# b)
+ggplot(
+  salaries,
+  aes(x = yrs.since.phd, y = salary, colour = discipline)
+) +
+  geom_jitter() +
+  stat_smooth(span = .8) +
+  scale_x_continuous('Years since PhD') +
+  scale_colour_brewer(palette = pals[3]) +
+  theme_minimal()
+```

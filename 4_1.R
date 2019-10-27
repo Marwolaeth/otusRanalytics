@@ -94,3 +94,65 @@ txhousing %>%
   ) +
   geom_bar(stat = 'identity') +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+display.brewer.all(3, type = 'qual', colorblindFriendly = TRUE)
+
+ggplot2movies::movies %>%
+  group_by(year) %>%
+  summarise(avg_budget = mean(budget, na.rm = TRUE)) %>%
+  filter(year >= 1970) %>% # Иначе слишком много значений
+  mutate(year = factor(year)) %>%
+  ggplot(aes(x = year, y = avg_budget)) +
+  geom_col(width = .7, fill = 'darkgrey') +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90))
+
+gapminder %>%
+  filter(year == last(unique(year))) %>% # Сравниваем ВВП для одного периода
+  group_by(continent) %>%
+  summarise(
+    min = min(gdpPercap, na.rm = TRUE),
+    max = max(gdpPercap, na.rm = TRUE)
+  ) %>%
+  gather('rank', 'gdp', -continent, factor_key = TRUE) %>%
+  ggplot(aes(x = continent, y = gdp, fill = rank)) +
+  geom_col(
+    position = position_dodge2(
+      width = .9, padding = .1
+    )
+  ) +
+  scale_y_continuous('GDP per capita') +
+  scale_fill_brewer('Rank', palette = pals[2]) +
+  theme_minimal()
+
+ggplot(salaries, aes(x = rank, y = salary, colour = sex)) +
+  geom_jitter(alpha = .5, position = position_jitterdodge(jitter.width = .2)) +
+  scale_colour_brewer(palette = pals[3]) +
+  stat_summary(
+    mapping = aes(group = sex),
+    fun.y = median,
+    geom = 'point',
+    shape = 18,
+    size = 3,
+    position = position_dodge(width = .2)
+  ) +
+  stat_summary(
+    mapping = aes(group = sex),
+    fun.data = median_hilow,
+    geom = 'errorbar',
+    width = .2,
+    lwd = 1,
+    position = 'dodge'
+  ) +
+  theme_minimal()
+
+ggplot(
+  salaries,
+  aes(x = yrs.since.phd, y = salary, colour = discipline)
+) +
+  geom_jitter() +
+  stat_smooth(span = .8) +
+  scale_x_continuous('Years since PhD') +
+  scale_colour_brewer(palette = pals[3]) +
+  theme_minimal()

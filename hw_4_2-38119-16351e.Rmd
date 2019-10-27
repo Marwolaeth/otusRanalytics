@@ -1,0 +1,27 @@
+---
+title: "ДЗ 4.2. ggplot-2"
+author: "Катин Алексей"
+date: "10 24 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1. Для `ggplot2movies::movies` визуализировать количество голосов (votes) относительно длины фильмы (length) с фасетированием по годам (year). Добавить линии тренда без доверительного интервала. Использовать логарифмические шкалы. https://ggplot2.tidyverse.org/reference/scale_continuous.html
+
+2. Для `gapminder::gapminder` визуализировать кроссплот между ВВП (gdpPercap) и средней продолжительностью жизни (LieExp) для каждого континента (continent). Использовать логарифмическую ось для ВВП. Добавить линию тренда с доверительным интервалом c функцией на ваш выбор (lm, loess, spline).
+
+3. Для данных `carData::Salaries` показать как зарплата (salary) зависит от количества лет после получения степени (yrs.since.phd), в зависимости от пола (цветом) и фасетировать по должности (rank) и дисциплине (discipline)
+
+4. Для `gapminder::gapminder` для всех континентов кроме океании визуализировать в виде линии временной ряд (year) средней продолжительности жизни (lifeExp). Фасетировать по континентам. Использовать цвета для линий каждой страны, которые находятся в `gapminder::country_colors`. Не забыть, что для линии нужно иногда указывать руками group. https://ggplot2.tidyverse.org/reference/aes_group_order.html, 
+https://ggplot2.tidyverse.org/reference/scale_manual.html
+
+5. Для продвинутых: воспроизвести график, данные здесь: https://raw.githubusercontent.com/kjhealy/assault-deaths/master/data/oecd-assault-series-per-100k-standardized-to-2015.csv 
+
+```{r, echo=FALSE}
+# Define variable containing url
+url <- "https://www.kieranhealy.org/files/misc/assault-deaths-oecd-ts-1960-2015.png"
+```
+<center><img src="`r url`"></center>
