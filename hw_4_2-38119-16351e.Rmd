@@ -5,18 +5,71 @@ date: "10 24 2019"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+if(!require('pacman')) install.packages('pacman')
+pacman::p_load(
+  tidyverse,
+  RColorBrewer,
+  gapminder,
+  ggplot2movies,
+  carData,
+  Hmisc,
+  reshape2,
+  readr
+)
 ```
 
 1. Для `ggplot2movies::movies` визуализировать количество голосов (votes) относительно длины фильмы (length) с фасетированием по годам (year). Добавить линии тренда без доверительного интервала. Использовать логарифмические шкалы. https://ggplot2.tidyverse.org/reference/scale_continuous.html
 
+```{r}
+ggplot(movies, aes(x = length, y = votes)) +
+  geom_jitter(alpha = .2, width = .5) +
+  scale_y_continuous(trans = 'log10') +
+  scale_x_continuous(trans = 'log10') +
+  stat_smooth(method = 'lm', se = FALSE) +
+  facet_wrap(~ year)
+
+# Жуть и мрак
+```
+
 2. Для `gapminder::gapminder` визуализировать кроссплот между ВВП (gdpPercap) и средней продолжительностью жизни (LieExp) для каждого континента (continent). Использовать логарифмическую ось для ВВП. Добавить линию тренда с доверительным интервалом c функцией на ваш выбор (lm, loess, spline).
+
+```{r}
+ggplot(gapminder, aes(x = gdpPercap, y = lifeExp)) +
+  geom_point(alpha = .2) +
+  scale_x_log10('GDP per capita') +
+  scale_y_continuous('Life Expectancy, years') +
+  stat_smooth(method = 'lm', colour = 'red', fullrange = TRUE, alpha = .6) +
+  facet_wrap(~ continent)
+```
 
 3. Для данных `carData::Salaries` показать как зарплата (salary) зависит от количества лет после получения степени (yrs.since.phd), в зависимости от пола (цветом) и фасетировать по должности (rank) и дисциплине (discipline)
 
+```{r}
+ggplot(Salaries, aes(x = yrs.since.phd, y = salary, colour = sex)) +
+  geom_point(alpha = .6) +
+  facet_grid(rank ~ discipline)
+```
+
 4. Для `gapminder::gapminder` для всех континентов кроме океании визуализировать в виде линии временной ряд (year) средней продолжительности жизни (lifeExp). Фасетировать по континентам. Использовать цвета для линий каждой страны, которые находятся в `gapminder::country_colors`. Не забыть, что для линии нужно иногда указывать руками group. https://ggplot2.tidyverse.org/reference/aes_group_order.html, 
 https://ggplot2.tidyverse.org/reference/scale_manual.html
+
+```{r}
+gapminder %>%
+  filter(continent != 'Oceania') %>%
+  ggplot(
+    aes(
+      x = as.Date(as.character(year), format = '%Y'),
+      y = lifeExp,
+      colour = country
+    )
+  ) +
+  geom_line(show.legend = FALSE) +
+  scale_x_date('Year') +
+  scale_colour_manual(values = country_colors) +
+  facet_wrap(~ continent)
+```
 
 5. Для продвинутых: воспроизвести график, данные здесь: https://raw.githubusercontent.com/kjhealy/assault-deaths/master/data/oecd-assault-series-per-100k-standardized-to-2015.csv 
 
@@ -25,3 +78,7 @@ https://ggplot2.tidyverse.org/reference/scale_manual.html
 url <- "https://www.kieranhealy.org/files/misc/assault-deaths-oecd-ts-1960-2015.png"
 ```
 <center><img src="`r url`"></center>
+
+```{r}
+assault <- read_csv('https://raw.githubusercontent.com/kjhealy/assault-deaths/master/data/oecd-assault-series-per-100k-standardized-to-2015.csv')
+```

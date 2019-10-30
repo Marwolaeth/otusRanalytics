@@ -14,7 +14,8 @@ pacman::p_load(
   gapminder,
   ggplot2movies,
   carData,
-  Hmisc
+  Hmisc,
+  reshape2
 )
 ```
 
@@ -99,7 +100,7 @@ ggplot2movies::movies %>%
 
 ```{r}
 gapminder %>%
-  filter(year == last(unique(year))) %>% # Сравниваем ВВП для одного периода
+  # filter(year == last(unique(year))) %>% # Сравниваем ВВП для одного периода
   group_by(continent) %>%
   summarise(
     min = min(gdpPercap, na.rm = TRUE),
@@ -115,6 +116,14 @@ gapminder %>%
   scale_y_continuous('GDP per capita') +
   scale_fill_brewer('Rank', palette = pals[2]) +
   theme_minimal()
+
+# gapminder %>%
+#   group_by(continent) %>%
+#   dplyr::summarize(min_gdpPercap = min(gdpPercap),
+#             max_gdpPercap = max(gdpPercap)) %>%
+#   melt(id.vars = "continent") %>%
+# ggplot(., aes(continent, value)) +
+# geom_bar(stat = "identity", position = position_dodge(.9), aes(fill = variable))
 ```
 
 6. Для данных `carData::Salaries` в свободной форме
