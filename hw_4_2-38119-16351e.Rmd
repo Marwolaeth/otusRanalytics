@@ -79,6 +79,64 @@ url <- "https://www.kieranhealy.org/files/misc/assault-deaths-oecd-ts-1960-2015.
 ```
 <center><img src="`r url`"></center>
 
-```{r}
+```{r message=FALSE}
 assault <- read_csv('https://raw.githubusercontent.com/kjhealy/assault-deaths/master/data/oecd-assault-series-per-100k-standardized-to-2015.csv')
+dim(assault)
+str(assault)
+names(assault)
+sum(complete.cases(assault))
+
+assault <- assault %>%
+  filter(!(Country %in% c('Estonia', 'Mexico'))) %>%
+  gather(key = 'year', value = 'deaths', -Country, na.rm = TRUE) %>%
+  mutate(year = as.integer(year))
+str(assault)
+
+# Что за страны, опережающие США?
+filter(assault, Country != 'United States' & deaths >= 4) # %>% View
+# Что это вообще за 23 страны???
+
+assault2 <- assault %>%
+  group_by(Country) %>%
+  filter(
+    Country == 'United States' |
+      (max(deaths) <= 4.2 & min(deaths) > 0 & min(year) <= 1985L)
+  ) %>%
+  ungroup()
+
+ggplot(
+  assault2,
+  aes(
+    x = year,
+    y = deaths,
+    colour = Country != 'United States',
+    fill   = Country != 'United States',
+    group  = Country
+  )
+) +
+  geom_jitter(size = 2, width = .1) +
+  scale_x_continuous('Year') +
+  scale_y_continuous(
+    'Assault Deaths per 100,000 population',
+    breaks = seq(0, 10, 2)
+  ) +
+  scale_colour_manual(
+    name = NULL,
+    values = c('#D55E00', '#0072B2'),
+    labels = c(
+      'United States',
+      sprintf('%d other OECD Countries', n_distinct(assault2$Country) - 1)
+    ),
+    aesthetics = c('colour', 'fill')
+  ) +
+  stat_smooth(lwd = 2) +
+  ggtitle(
+    'Assault Death Rates in the OECD, 1960-2015'
+  ) +
+  labs(caption = 'Data: OECD. Excludes Estonia and Mexico') +
+  theme_bw() +
+  theme(
+    legend.position = 'top',
+    plot.caption = element_text(colour = '#8E8E8E', size = 8)
+  )
 ```
