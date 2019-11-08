@@ -1,7 +1,7 @@
 ---
 title: "hw_4_3"
 author: "Бикмаев Руслан"
-date: "03 11 2019"
+date: "07 11 2019"
 output: html_document
 ---
 
@@ -10,14 +10,13 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 ## ДЗ 4.3
 
- Для упражнения используются  данные so.csv, прекрепленные к материалам прошлого урока
-1. Загрузите данные.
-2. Сделайте выборку из 5 произвольных пользователей, сформировавших достаточное количество данных (постов).
-3. Нарежьте и сгруппируйте данные по времени суток, используя отрезки от 1 до 3-х часов. То есть разбив сутки на отрезки через 1, 2 или 3 часа на выбор. Можно из колонки с датами взять только часы - это разобьет сутки по часу.
-4. Создайте колонку, отражающую степень разговорчивости пользователя, измеряющую число слов в каждом посте. Число постов в конкретный период времени измерять не нужно.
-5. Самостоятельно выбирите систему визуализации данных, наиболее наглядно, на ваш взгляд, отражающую степень разговорчивости пользователя (из данной выборки), в зависимости от времени суток и постройте графики.
-В связи с различием настройки локалей в разных системах, выполните задание в формате pdf  или html.
-
+ Для упражнения используются материалы и код предыдущего занятия.
+1.Дополните данные, использованные в прошлом занятии столбцом с датами (без времени) и создайте анимированную визуализацию с проигрыванием движения по временному ряду как в примере на занятии  и с отображением уровня разговорчивости в каждый час (или 2-х, 3-х часовой отрезок) .
+(помечен в комментариях, как  "# пример для ДЗ" в файле "code.R" с материалами урока ) 
+Способ визуализации уровня уровня болтливости и привязки ко времени суток выбирите самостоятельно. 
+Можно выбрать ограниченную выборку по времени, на которой наглядно видно изменчивость данного параметра.
+2.К  заданию приложите датасет с преобразованными данными.csv, содержащими колонки:
+"user", "date", "H", "count_W" 
 
 Желательно сдать домашнее задание до 23:59 10.11.2019 г.
 
@@ -25,7 +24,7 @@ knitr::opts_chunk$set(echo = TRUE)
  * Домашняя работа сдана (1 балл)
  * Измерения проведены корректно, описание подробное (1 балл)
  * Код оформлен согласно рекомендациям tidyverse (1 балл)
- * Графики отражают оговоренную в задаче взаимосвязь (2 балла)
+ * Графики запускаются, отражают оговоренную в задаче взаимосвязь (2 балла)
  
 
 **Минимальное количество баллов для зачета - 5**
@@ -34,7 +33,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r message=FALSE, results='hide'}
 if(!require('pacman')) install.packages('pacman')
-pacman::p_load(data.table, lubridate, ggplot2, stringr, colorspace)
+pacman::p_load(data.table, lubridate, ggplot2, stringr)
 ```
 
 ```{r message=FALSE}
@@ -102,11 +101,13 @@ so_cl <- copy(so)
 ```{r}
 so[, hour := {
   # Округлим даты при помощи lubridate
-  h = floor_date(created, unit = '1 hour')
+  h = floor_date(created, unit = '1 hours')
   # Другой вариант: as.numeric(format(created, '%H'))
   h = hour(h)
   }
 ]
+
+so[, post_date := lubridate::date(created)]
 str(so)
 summary(so$hour)
 ```
@@ -126,13 +127,13 @@ so[, .(last_post = max(created)), by = user]
 3. Рассчитать количество слов в постах
 
 ```{r}
-so[, nwords := stringr::str_count(text, "\\w+")]
+so[, count_w := stringr::str_count(text, "\\w+")]
 
 # Небольшая сводная статистика
 so[, .(
-  sum    = sum(nwords),
-  mean   = mean(nwords),
-  median = median(nwords),
+  sum    = sum(count_w),
+  mean   = mean(count_w),
+  median = median(count_w),
   nposts = .N
 ),
 by = user
@@ -140,6 +141,12 @@ by = user
 ```
 
 4. Оценить «словесную активность» выбранных пользователей по времени суток
+
+```{r}
+ggplot(so, aes(x = hour, y = count_w, colour = user)) +
+  geom_jitter(alpha = .2) +
+  stat_smooth(method = 'loess', span = 1)
+```
 
 Вопрос: какой показатель сводки количества слов выбрать в качестве меры активности?
 
@@ -152,11 +159,7 @@ by = user
 ```{r}
 setkey(so, user, hour)
 so_sum <- so[,
-  .(n_words  = sum(nwords),
-    m_words  = mean(nwords),
-    md_words = as.numeric(median(nwords)),
-    q1_words = quantile(nwords, .25),
-    q3_words = quantile(nwords, .75)),
+  .(n_words = sum(nwords)),
   by = .(user, hour)
 ]
 
@@ -172,40 +175,4 @@ so_sum <- so_total[so_sum]
 rm(so_total)
 so_sum[, p_words := n_words / total_words]
 summary(so_sum)
-```
-
-```{r}
-ggplot(
-  so_sum,
-  aes(
-    x = hour,
-    y = md_words,
-    colour = factor(user),
-    fill = factor(user)
-  )) +
-  geom_line(lwd = 2, show.legend = FALSE) +
-  geom_linerange(
-    aes(
-      ymin = q1_words,
-      ymax = q3_words,
-      colour = factor(user),
-      group = user
-    ),
-    alpha = .3,
-    size = 12,
-    show.legend = FALSE
-  ) +
-  scale_x_continuous(
-    'Время суток',
-    breaks = seq(0, 23, 1),
-    limits = c(0, 23),
-    expand = c(.01, .01)
-  ) +
-  scale_y_continuous('Доля от всех слов') +
-  scale_colour_discrete_qualitative(
-    name = 'Пользователь',
-    palette = 'Dynamic'
-  ) +
-  facet_wrap(~ user, ncol = 1) +
-  theme_light()
 ```
