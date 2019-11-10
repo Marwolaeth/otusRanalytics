@@ -102,7 +102,7 @@ so_cl <- copy(so)
 ```{r}
 so[, hour := {
   # Округлим даты при помощи lubridate
-  h = floor_date(created, unit = '1 hour')
+  h = floor_date(created, unit = '2 hours')
   # Другой вариант: as.numeric(format(created, '%H'))
   h = hour(h)
   }
@@ -179,33 +179,29 @@ ggplot(
   so_sum,
   aes(
     x = hour,
-    y = md_words,
-    colour = factor(user),
-    fill = factor(user)
+    y = p_words,
+    colour = factor(user)
   )) +
   geom_line(lwd = 2, show.legend = FALSE) +
-  geom_linerange(
-    aes(
-      ymin = q1_words,
-      ymax = q3_words,
-      colour = factor(user),
-      group = user
-    ),
-    alpha = .3,
-    size = 12,
-    show.legend = FALSE
-  ) +
   scale_x_continuous(
     'Время суток',
-    breaks = seq(0, 23, 1),
-    limits = c(0, 23),
-    expand = c(.01, .01)
+    breaks = seq(0, 22, 2),
+    minor_breaks = NULL,
+    limits = c(0, 22),
+    expand = c(.01, .01),
+    labels = function(x) sprintf('%d–%d', x, x + 2)
   ) +
-  scale_y_continuous('Доля от всех слов') +
+  scale_y_continuous(
+    '% от всех слов',
+    labels = function(x) scales::percent(x, accuracy = 1)
+  ) +
   scale_colour_discrete_qualitative(
     name = 'Пользователь',
     palette = 'Dynamic'
   ) +
   facet_wrap(~ user, ncol = 1) +
-  theme_light()
+  theme_light() +
+  ggtitle('ТОП-5 пользователей: активность по времени суток')
 ```
+
+Паттерны активности топ-пользователей Социофорума примерно совпадают (за исключением пользователя ```Darlana```): низкая активность в ночное время, пик активности приходится на вторую половину дня (у пользователtей ```Штушкутуш``` и ```Багирко``` — примерно послеобеденное время, у пользователей ```Gabriela``` и ```sute_girl``` — ближе к концу рабочего дня). Пик активности пользователя ```Darlana``` приходится на ночное время примерно до 4 часов утра.

@@ -52,8 +52,8 @@ ggplot(
   ) +
   scale_x_continuous(
     'Время суток',
-    breaks = seq(0, 23, 1),
-    limits = c(0, 23),
+    breaks = seq(0, 22, 2),
+    limits = c(0, 22),
     expand = c(.01, .01)
   ) +
   scale_y_continuous('Доля от всех слов') +
@@ -63,3 +63,61 @@ ggplot(
   ) +
   facet_wrap(~ user, ncol = 1) +
   theme_light()
+
+###############################
+
+ggplot(
+  so_sum,
+  aes(
+    x = hour,
+    y = p_words,
+    colour = factor(user),
+    fill = factor(user)
+  )) +
+  geom_line(lwd = 2, show.legend = FALSE) +
+  scale_x_continuous(
+    'Время суток',
+    breaks = seq(0, 23, 1),
+    limits = c(0, 23),
+    expand = c(.01, .01)
+  ) +
+  scale_y_continuous(
+    '% от всех слов',
+    labels = function(x) scales::percent(x, accuracy = 1)
+  ) +
+  scale_colour_discrete_qualitative(
+    name = 'Пользователь',
+    palette = 'Dynamic'
+  ) +
+  facet_wrap(~ user, ncol = 1) +
+  theme_light()
+
+###########################################
+
+ggplot(
+  so_sum,
+  aes(
+    x = hour,
+    y = p_words,
+    colour = factor(user)
+  )) +
+  geom_line(lwd = 2, show.legend = FALSE) +
+  scale_x_continuous(
+    'Время суток',
+    breaks = seq(0, 22, 2),
+    minor_breaks = NULL,
+    limits = c(0, 22),
+    expand = c(.01, .01),
+    labels = function(x) sprintf('%d–%d', x, x + 2)
+  ) +
+  scale_y_continuous(
+    '% от всех слов',
+    labels = function(x) scales::percent(x, accuracy = 1)
+  ) +
+  scale_colour_discrete_qualitative(
+    name = 'Пользователь',
+    palette = 'Dynamic'
+  ) +
+  facet_wrap(~ user, ncol = 1) +
+  theme_light() +
+  ggtitle('ТОП-5 пользователей: активность по времени суток')
