@@ -645,7 +645,7 @@ add_column_df <- function(df) {
   return(df)
 }
 
-# Когда мы вызываем функцию, мы видим addcol1в выводе. Но нет addcol2. Это потому, 
+# Когда мы вызываем функцию, мы видим addcol1 в выводе. Но нет addcol2. Это потому, 
 # что он был добавлен df в глобальную среду на один уровень выше.
 
 head(add_column_df(df))
@@ -685,4 +685,4 @@ df <- head(mtcars) # doesn't print
 (df <- head(mtcars)) # does print
 
 dt <- data.table(head(mtcars)) # doesn't print
-dt[,hp2wt:=hp/wt][] # does print
+dt[,hp2wt := hp/wt][] # does print
