@@ -34,7 +34,14 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r message=FALSE, results='hide'}
 if(!require('pacman')) install.packages('pacman')
-pacman::p_load(data.table, lubridate, ggplot2, stringr, colorspace)
+pacman::p_load(
+  data.table,
+  lubridate,
+  ggplot2,
+  stringr,
+  colorspace,
+  plotly
+)
 ```
 
 ```{r message=FALSE}
@@ -60,11 +67,12 @@ so[, created := as.POSIXct(
 
 so <- so[!is.na(created)]
 so_cl <- copy(so)
+# so <- copy(so_cl)
 
-# Ограничение периода
-so <- so[year(created) > 2013]
+# Ограничение выборки по датам ближе к концу охваченного периода, но не в 2018
+so <- so[year(created) > 2015 & year(created) < 2018]
 
-so[, hour := {
+so[, H := {
   # Округлим даты при помощи lubridate
   h = floor_date(created, unit = '2 hours')
   # Другой вариант: as.numeric(format(created, '%H'))
@@ -72,46 +80,92 @@ so[, hour := {
   }
 ]
 
-so[, period := {
-  # Округлим даты при помощи lubridate
-  p = floor_date(created, unit = '3 months')
-  # Другой вариант: as.numeric(format(created, '%H'))
-  p = format(p, '%B %Y')
-  }
+so[, date    := date(floor_date(created, unit = '3 months'))][
+  ,  date_ch := format(date, format = '%B %Y')
+  # Человеческое название периода
 ]
 
 setkey(so, user)
-so <- so[user %chin% so[, .N, by = user][order(-N)][1:5, user]]
+# Отбор пользователей, активных в течение всего выбранного периода
+# С наибольшим количеством сообщений
+so <- so[user %chin% so[, .(
+  .N,
+  first = min(created), last = max(created)
+), by = user][
+  first <= ymd("2016-01-31") & last >= ymd("2017-10-31")
+][
+  order(-N)
+][
+  1:5, user
+]]
+
+so[, .(first_post = min(created),
+       last_post  = max(created)),
+   by = user]
 
 so[, nwords := stringr::str_count(text, "\\w+")]
 
-so_sum <- so[,
-  .(n_words  = sum(nwords)),
-  keyby = .(user, hour)
+# Небольшая сводная статистика
+so[, .(
+  sum    = sum(nwords),
+  mean   = mean(nwords),
+  median = median(nwords),
+  nposts = .N
+),
+by = user
 ]
-
-so_total <- so_sum[,
-  .(total_words = sum(n_words)),
-  by = user
-]
-
-so_sum <- so_total[so_sum]
-rm(so_total)
-so_sum[, p_words := n_words / total_words]
 ```
 
-### 2. Изображение
+
+### 2. Агрегирование
+
+```{r}
+if (!exists("so_mod")) {
+  if (file.exists("so_mod.csv")) {
+    so_mod <- fread("so_mod.csv", encoding = "UTF-8")
+  } else {
+    so_sum <- so[,
+      .(
+        n_words = median(nwords, na.rm = TRUE),
+        .N
+      ),
+      keyby = .(user, date, date_ch, H)
+    ]
+
+    so_total <- so_sum[,
+      .(total_words = sum(n_words)),
+      by = .(user, date)
+    ]
+
+    so_sum <- so_total[so_sum]
+    rm(so_total)
+    so_sum[, count_W := n_words / total_words]
+    setkey(so_sum, NULL)
+
+    so_mod <- so_sum[, .(user, date, H, count_W)]
+  }
+}
+
+if (!file.exists('so_mod.csv')) fwrite(so_mod, file = 'so_mod.csv')
+```
+
+### 3. Изображение
 
 ```{r}
 p <- ggplot(
-  so_sum,
+  so_mod,
   aes(
-    x = hour,
-    y = p_words,
-    colour = factor(user),
-    frame = period
+    x = H,
+    y = count_W,
+    colour = factor(user)
   )) +
-  geom_line(lwd = 2, show.legend = FALSE) +
+  geom_line(
+    aes(
+      frame = date,
+      ids = H
+    ),
+    lwd = 2,
+    show.legend = FALSE) +
   scale_x_continuous(
     'Время суток',
     breaks = seq(0, 22, 2),
@@ -131,6 +185,22 @@ p <- ggplot(
   facet_wrap(~ user, ncol = 1) +
   theme_light() +
   ggtitle('ТОП-5 пользователей: активность по времени суток')
-
-ggplotly(p)
 ```
+
+```{r}
+ggplotly(p, width = 600, height = 600, autosize = FALSE) %>%
+  animation_slider(
+    currentvalue = list(prefix = 'Период: ')
+  ) %>%
+  animation_opts(frame = 2500, easing = 'elastic', redraw = TRUE) %>%
+  layout(showlegend = FALSE)
+```
+
+Итого, у меня не получается в полной мере управлять внешним видом анимированного графика, который генерируется с помощью `plotly`. В частности не получилось:
+
+- увеличить отступы между осями и названиями осей;
+- изменить значений подписей осей (даты);
+- изменить угол поворота подписей оси x;
+- изменить префикс в отображении текущего периода (currentvalue).
+
+Инструкции к пакету `plotly` не помогли прояснить ситуацию. Надеюсь получить Ваш комментарий.
