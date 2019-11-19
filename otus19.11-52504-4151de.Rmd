@@ -1,0 +1,227 @@
+---
+title: "otus_19.11.19"
+author: "Oksana Laputskaya"
+date: '19 ноября 2019 г '
+output: html_document
+---
+###Практика очистки данных для последующего построения модели
+```{r}
+Data<-read.csv("train_data_52504_072d1f-52504-27eb3e.csv")
+summary(Data)
+
+#Обратите внимание на разброс данных переменной Item_Outlet_Sales
+```
+```{r}
+nrows <- nrow(Data)
+ncomplete <- sum(complete.cases(Data))
+ncomplete
+ncomplete/nrows
+```
+
+```{r}
+
+
+library(ggplot2)
+#Строим распределение зависимой переменной
+pl1 <- ggplot(Data, aes(Item_Outlet_Sales))
+pl1 + geom_density(fill = "red", alpha = "0.7")
+```
+```{r}
+library(dplyr)
+outlier <- Data %>% filter(Item_Outlet_Sales == 33333)
+outlier
+```
+
+```{r}
+
+Data <- Data %>% filter(Item_Outlet_Sales != 33333)
+
+pl2 <- ggplot(Data, aes(Item_Outlet_Sales))
+pl2 + geom_density(fill = "blue", alpha = "0.5")
+```
+
+```{r}
+summary(Data$Item_Outlet_Sales)
+```
+
+```{r}
+#with gsub replacing the levels with Regular or lowfat as required
+Data$Item_Fat_Content <- gsub("LF", "lowfat",Data$Item_Fat_Content)
+Data$Item_Fat_Content <- gsub("low fat", "lowfat",Data$Item_Fat_Content)
+Data$Item_Fat_Content <- gsub("Low Fat", "lowfat",Data$Item_Fat_Content)
+Data$Item_Fat_Content <- gsub("reg", "Regular",Data$Item_Fat_Content)
+Data$Item_Fat_Content <- as.factor(Data$Item_Fat_Content)
+summary(Data$Item_Fat_Content)
+```
+```{r}
+
+#используем среднее для замены пропущенных значений в Item_Weight 
+MeanItem_Weight <- mean(Data$Item_Weight[!is.na(Data$Item_Weight)])
+Data$Item_Weight[is.na(Data$Item_Weight)] <- MeanItem_Weight
+#используем линейную регрессию для замены нулей в Item_visibility
+Data_1 <- Data %>% filter(Item_Visibility != 0)
+visibility_model <- lm(Item_Visibility ~ Item_Weight + Item_Fat_Content +
+                         Item_Type + Item_MRP + 
+                         Outlet_Establishment_Year + Outlet_Size + 
+                         Outlet_Location_Type + Item_Outlet_Sales,
+                         data = Data_1)
+Data$Item_Visibility[Data$Item_Visibility == 0] <- 
+  predict(visibility_model,newdata = Data[Data$Item_Visibility == 0,])
+
+```
+
+```{r}
+summary(Data)#данные готовы для анализа
+
+```
+###Пакеты для предобработки данных
+
+1.mice
+
+```{r}
+set.seed(1)
+dataset <- data.frame(var1=rnorm(20,0,1), var2=rnorm(20,5,1))
+    dataset[c(2,5,7,10),1] <- NA
+    dataset[c(4,8,19),2] <- NA
+    summary(dataset)
+    pacman::p_load(mice)
+    require(mice)
+    dataset2 <- mice(dataset)
+    dataset2<-complete(dataset2)
+    summary(dataset2)
+```
+2. dlookr
+
+*изучаем выбросы данных
+
+```{r}
+pacman::p_load(ISLR, dlookr)
+carseats <- ISLR::Carseats
+carseats[sample(seq(NROW(carseats)), 20), "Income"] <- NA
+carseats[sample(seq(NROW(carseats)), 5), "Urban"] <- NA
+library(dlookr)
+find_outliers(carseats)
+
+find_outliers(carseats, index = FALSE)
+
+find_outliers(carseats, rate = TRUE)
+
+```
+
+```{r}
+
+library(dplyr)
+library(nycflights13)
+# Perform simple data quality diagnosis of variables with outliers.
+nycflights13::flights %>%
+  select(find_outliers(.)) %>%
+  diagnose()
+
+```
+
+*строим графики выбросов данных
+
+```{r}
+library(nycflights13)
+flights %>%
+  plot_outlier(diagnose_outlier(flights) %>% 
+                 filter(outliers_ratio >= 0.5) %>% 
+                 select(variables) %>% 
+                 unlist())
+```
+
+
+
+
+
+###Решение задачи классификации
+
+Загрузим данные из приложенного файла
+```{r}
+pacman::p_load(ISLR, tree)
+library(ISLR)
+library(tree)
+
+head(Carseats)
+
+attach(Carseats)
+str(Carseats)
+
+```
+
+```{r}
+summary(Sales)
+
+High = ifelse(Sales >= 8, "Yes", "No")
+
+Carseats = Carseats[, -1] 
+Carseats = data.frame(Carseats, High) 
+```
+ 
+Посмотрим обновленный датасет: 
+ 
+```{r}
+str(Carseats)
+n = nrow(Carseats)
+test = sample(1:n, n/3)
+train = -test
+
+```
+
+```{r}
+training_set = Carseats[train, ]
+testing_set = Carseats[test, ]
+
+tree_model = tree(High~., training_set)
+plot(tree_model)
+text(tree_model)
+tree_pred = predict(tree_model, testing_set, type="class")
+mean(tree_pred != High[test])
+```
+
+```{r}
+
+cv_tree = cv.tree(tree_model, FUN=prune.misclass)
+plot(cv_tree$size, cv_tree$dev, type="b")
+```
+
+```{r}
+prune_model = prune.misclass(tree_model, best=6)
+plot(prune_model)
+text(prune_model)
+print(prune_model)
+```
+
+```{r}
+tree_pred1 = predict(prune_model, testing_set, type="class")
+mean(tree_pred1 != High[test])
+```
+Задание:Напишите функцию, которая будет вычислять меру f1
+
+```{r}
+# Было бы удобнее Yes на месте No и наоборот
+(tab <- table(testing_set$High, tree_pred1))
+
+(F1 <- 2 * tab[2,2] / (2 * tab[2,2] + tab[1,2] + tab[2,1]))
+```
+
+###Еще пакеты для визуализации деревьев
+
+```{r}
+pacman::p_load(party, rpart, rpart.plot, rattle)
+library(party)
+ct = ctree(High~., training_set)
+plot(ct)
+```
+
+```{r}
+library(rpart)
+library(rpart.plot)
+rp = rpart(High~., training_set)
+prp(rp)
+```
+```{r}
+library(rattle)
+fancyRpartPlot(rp)
+```
+
