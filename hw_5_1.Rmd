@@ -1,0 +1,184 @@
+---
+title: "Howework 5_1"
+author: "Andrej Pawluczenko"
+date: '24 ноября 2019 г '
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+*Установка и загрузка библиотек:*
+
+```{r packages_load, message=FALSE, warning=FALSE}
+if(!require('pacman')) install.packages('pacman')
+pacman::p_load(
+  checkpoint,
+  tidyverse,
+  forcats,
+  stringr,
+  readr,
+  dlookr,
+  tree,
+  rpart,
+  rpart.plot,
+  rattle
+)
+
+# checkpoint('2019-11-24')
+```
+
+
+
+## Данные
+
+### Общая информация
+
+В качестве учебного примера мы используем [набор](http://archive.ics.uci.edu/ml/datasets/Bank+Marketing) данных по банковскому телемаркетингу, предоставленные одним из португальских банков в 2012 г.
+
+Одна из причин выбора данных — их близость к нашей привычной социо-гуманиторной сфере (сюда относятся и отношения с клиентами), другая — большая популярность набора: так в случае непредвиденных осложнений мы скорее найдем помощь в интернете.
+
+*Скачивание данных:*
+
+```{r data_download}
+if (!file.exists('data/bank-additional-full.csv')) {
+  if (!file.exists('data/bank-additional.zip')) {
+    if (!dir.exists('data')) dir.create('data')
+    download.file(
+      'http://archive.ics.uci.edu/ml/machine-learning-databases/00222/bank-additional.zip',
+      destfile = 'data/bank-additional.zip'
+    )
+  }
+  unzip(
+    'data/bank-additional.zip',
+    files = c(
+      'bank-additional/bank-additional-full.csv',
+      'bank-additional/bank-additional-names.txt'
+    ),
+    exdir = 'data',
+    junkpaths = TRUE
+  )
+}
+```
+
+### Описание
+
+Набор данных создан для задач классификации. Каждое наблюдение описывает один сеанс переговоров с клиентом. Зависимая переменная `y` — открыл ли срочный депозитный вклад в банке. Признаковое пространство данных содержит информацию о времени разговора, экономические и демографические характеристики клиента, а так же (в расширенном наборе данных) несколько важных экономических индексов по стране на момент разговора. Полное описание переменных можно посмотреть на [странице](http://archive.ics.uci.edu/ml/datasets/Bank+Marketing) набора на сайте Калифорнийского университета в Ирвайне или в файле `data/bank-additional-names.txt`.
+
+### Предобработка и разведочный анализ
+
+Методом проб и ошибок установлено, что csv-файл содержит редкое сочетание разделителя — точки с запятой и разделителя дробной части — точки.
+
+*Чтение данных и просмотр:*
+
+```{r data_load, message=FALSE}
+data <- read_delim(
+  'data/bank-additional-full.csv',
+  delim = ';',
+  locale = locale(decimal_mark = '.')
+)
+glimpse(data)
+summary(data)
+```
+
+#### Предобработка
+
+Согласно описанию данных, все переменные с буквенными данными — категории (факторы), причем некоторые (например, образование, для прочих это не принципиально) —упорядоченные. Использование категорий может быть важным для дальнейшего анализа и визуализации. Также в переменной `pdays` (количество дней, прошедших со  дня предыдущего разговора с клиентом) пропущенное значение (точнее, неприменимое к данным наблюдениям) закодировано как 999. Также говорится, что переменную `duration` (продолжительность разговора в секундах) лучше исключить из анализа, так как она слишком сильно влияет на зависимую переменную при значении равном 0.
+
+*Перекодировка переменных:*
+
+```{r data_preprocess}
+data <- data %>%
+  mutate(
+    education_info = if_else(
+      education == 'unknown',
+      'unknown',
+      'known'
+    )
+  ) %>%
+  mutate(
+    education = if_else(
+      education != 'unknown',
+      education,
+      NA_character_
+      # Иначе ошибка: несовпадение классов
+    )
+  ) %>%
+  # 999 means client was not previously contacted
+  # распространенная метка для пропущенных значений, например, в SPSS
+  # i.e. previous == 0 & poutcome == "nonexistent"
+  # see: tapply(data$pdays, data$poutcome, mean)
+  mutate(
+    pdays = if_else(
+      pdays == 999,
+      NaN,
+      pdays
+    )
+  ) %>%
+  mutate_if(is.character, as.factor) %>%
+  mutate(
+    education = factor(
+      education,
+      ordered = TRUE,
+      levels = c(
+        'illiterate',
+        'basic.4y',
+        'basic.6y',
+        'basic.9y',
+        'high.school',
+        'professional.course',
+        'university.degree'
+      )
+    )
+  ) %>%
+  # this input should only be included for benchmark purposes
+  # and should be discarded if
+  # the intention is to have a realistic predictive model
+  select(-duration)
+```
+
+Таким образом, мы создали пропущенные значения там, где их не было. Однако пропущенная информация содержится в других переменных, что хорошо именно для классификации методом деревьев.
+
+#### Поиск выбросов
+
+С помощью пакета `dlookr` найдем переменные с выбросами:
+
+```{r data_outlier}
+dlookr::describe(data)
+
+dlookr::find_outliers(data, rate = TRUE, index = FALSE)
+```
+
+Что делать с выбросами в перечисленных переменных:
+
+* `age` (возраст клиента):
+    + **Возможная причина:** нормальная ситуация для данных, где представлены один или несколькр долгожителей;
+    + **Решение:** оставить;
+* `campaign` (количество контактов с клиентом в рамках текущей телемаркетинговой кампании), `pdays` (Количество дней с последних переговоров с клиентом в рамках *предыдущей* кампании), `previous` (количество контактов с данным клиентом *до* настоящей кампании):
+    + **Возможная причина:** есть какое-то количество клиентов с аномально большим количеством контактов; скорее всего, ничего особенного в этом нет;
+    + **Решение:** проверить влияние на зависимую переменную.
+
+Проверка влияния выбросов на зависимую переменную (в соответствии с [инструкцией](https://cran.r-project.org/web/packages/dlookr/vignettes/EDA.html) по пакету `dlookr`):
+
+```{r data_outlier_inflence}
+dlookr::relate(data_target, campaign)
+dlookr::relate(data_target, pdays)
+dlookr::relate(data_target, previous)
+
+rm(data_target)
+```
+
+Сопоставление числовых данных со значением зависимой переменной, как и диапазон значений самих переменных, показывают, что удаления выбросов, скорее всего, не требуется.
+
+## Анализ
+
+**Разбиение на тренироволчный и тестовый наборы (2 к 1):**
+
+```{r analysis_split}
+n <- nrow(data)
+
+set.seed(1111)
+test  <- sample(1:n, n / 3)
+train <- -test
+```
