@@ -132,10 +132,13 @@ data <- data %>%
       )
     )
   ) %>%
-  # this input should only be included for benchmark purposes
+  # This input should only be included for benchmark purposes
   # and should be discarded if
   # the intention is to have a realistic predictive model
-  select(-duration)
+  select(-duration) %>%
+  # Reorder the levels of the dependent variable
+  # so that model evaluation and interpretation can be more straightforward
+  mutate(y = relevel(y, 'yes'))
 ```
 
 Таким образом, мы создали пропущенные значения там, где их не было. Однако пропущенная информация содержится в других переменных, что хорошо именно для классификации методом деревьев.
@@ -161,7 +164,9 @@ dlookr::find_outliers(data, rate = TRUE, index = FALSE)
 
 Проверка влияния выбросов на зависимую переменную (в соответствии с [инструкцией](https://cran.r-project.org/web/packages/dlookr/vignettes/EDA.html) по пакету `dlookr`):
 
-```{r data_outlier_inflence}
+```{r data_outlier_inflence, warning=FALSE}
+data_target <- dlookr::target_by(data, y)
+
 dlookr::relate(data_target, campaign)
 dlookr::relate(data_target, pdays)
 dlookr::relate(data_target, previous)
@@ -173,12 +178,117 @@ rm(data_target)
 
 ## Анализ
 
-**Разбиение на тренироволчный и тестовый наборы (2 к 1):**
+*Разбиение на тренироволчный и тестовый наборы:*
 
 ```{r analysis_split}
-n <- nrow(data)
+data$id = 1:nrow(data)
 
 set.seed(1111)
-test  <- sample(1:n, n / 3)
-train <- -test
+data_train <- data %>%
+  group_by(y) %>%
+  sample_frac(.7) %>%
+  ungroup()
+summary(data_train)
+
+data_test <- data %>%
+  anti_join(data_train, by = 'id') %>%
+  select(-id)
+# Избавляемся от колонки id, которая является лишней при обучении модели
+data_train <- select(data_train, -id)
+
+# Убедимся, что разбиение корректно
+nrow(data_train) + nrow(data_test) == nrow(data)
+```
+
+### Функции оценки моделей
+
+В начале создадим вручную несколько функций для оценки моделей. Для ориентира приводится таблица — шаблон матрицы ошибок
+
+```{r confusion_matrix, echo=FALSE}
+t <- matrix(
+  c('TP', 'FN', 'FP', 'TN'),
+  ncol = 2,
+  dimnames = list(
+    Predicted = c('Yes', 'No'),
+    Actual    = c('Yes', 'No')
+  )
+)
+
+print(t, comment = FALSE, quote = FALSE, print.gap = 4)
+```
+
+
+```{r model_evaluation}
+# Все три элементарные функции принимают на вход
+# векторы предсказанных (predicted) и истинных (reference) значений
+# после чего строят матрицу ошибок для вычисления показателей
+
+.cmatrix <- function(predicted, reference, print.tab) {
+  tab <- table(Predicted = predicted, Actual = reference)
+  if (print.tab) print(tab, comment = FALSE, quote = FALSE, print.gap = 4)
+  assign('TP', tab[1, 1], pos = parent.frame())
+  assign('FP', tab[1, 2], pos = parent.frame())
+  assign('FN', tab[2, 1], pos = parent.frame())
+  assign('TN', tab[2, 2], pos = parent.frame())
+}
+
+accuracy <- function(predicted, reference, print.tab = TRUE) {
+  .cmatrix(predicted, reference, print.tab)
+  (TP + TN) / (TP + FP + FN + TN)
+}
+
+precision <- function(predicted, reference, print.tab = TRUE) {
+  .cmatrix(predicted, reference, print.tab)
+  TP / (TP + FP)
+}
+
+recall <- function(predicted, reference, print.tab = TRUE) {
+  .cmatrix(predicted, reference, print.tab)
+  TP / (TP + FN)
+}
+
+specificity <- function(predicted, reference, print.tab = TRUE) {
+  .cmatrix(predicted, reference, print.tab)
+  TN / (TN + FP)
+}
+
+# Единая функция для расчета всех индексов + показатель F1
+evaluate_model <- function(predicted, reference, print.tab = TRUE) {
+  if (print.tab) cat('\nConfusion matrix:\n\n')
+  .cmatrix(predicted, reference, print.tab)
+  if (print.tab) cat('\n\nModel scores:\n\n')
+  return(
+    c(
+      Accuracy    = (TP + TN) / (TP + FP + FN + TN),
+      Precision   = TP / (TP + FP),
+      Recall      = TP / (TP + FN),
+      Specificity = TN / (TN + FP),
+      'F1 Score'  = 2*TP / (2*TP + FP + FN)
+    )
+  )
+}
+```
+
+Протестируем функции на синтезированных данных:
+
+```{r model_evaluation_test}
+pred <- sample(data$y, length(data$y))
+
+accuracy(data$y, data$y)
+accuracy(pred, data$y)
+precision(data$y, data$y, print.tab = FALSE)
+precision(pred, data$y, print.tab = FALSE)
+recall(data$y, data$y, print.tab = FALSE)
+recall(pred, data$y, print.tab = FALSE)
+specificity(pred, data$y, print.tab = FALSE)
+
+evaluate_model(pred, data$y, print.tab = FALSE)
+```
+
+### Деревья классификации
+
+Для анализа мы воспользуемся функцией построения деревьев классификации из пакета `rpart`.
+
+```{r tree_01}
+
 ```

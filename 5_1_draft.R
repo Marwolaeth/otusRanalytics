@@ -8,7 +8,8 @@ pacman::p_load(
   tree,
   rpart,
   rpart.plot,
-  rattle
+  rattle,
+  caret
 )
 
 if (!file.exists('data/bank-additional-full.csv')) {
@@ -88,7 +89,8 @@ data <- data %>%
   # this input should only be included for benchmark purposes
   # and should be discarded if
   # the intention is to have a realistic predictive model
-  select(-duration)
+  select(-duration) %>%
+  mutate(y = relevel(y, 'yes'))
 summary(data, maxsum = 12)
 
 dlookr::find_outliers(data, rate = TRUE, index = FALSE)
@@ -105,6 +107,7 @@ data_target <- dlookr::target_by(data, y)
 dlookr::relate(data_target, campaign)
 dlookr::relate(data_target, pdays)
 dlookr::relate(data_target, previous)
+dlookr::relate(data_target, cons.conf.idx)
 rm(data_target)
 
 n <- nrow(data)
@@ -115,30 +118,200 @@ train <- -test
 data_train <- data[train, ]
 data_test  <- data[test,  ]
 
+data$id = 1:nrow(data)
+
+set.seed(1111)
+data_train <- data %>%
+  group_by(y) %>%
+  sample_frac(.7) %>%
+  ungroup()
+summary(data_train)
+
+data_test <- data %>%
+  anti_join(data_train, by = 'id') %>%
+  select(-id)
+
+data_train <- select(data_train, -id)
+
+nrow(data_train) + nrow(data_test) == nrow(data)
+
+(tab <- table(
+  A = replicate(10, sample(LETTERS[1:5], 1)),
+  B = replicate(10, sample(letters[1:5], 1))
+))
+str(tab)
+
+(t <- matrix(
+  c('TP', 'FN', 'FP', 'TN'),
+  ncol = 2,
+  dimnames = list(
+    Predicted = c('Yes', 'No'),
+    Actual    = c('Yes', 'No')
+  )
+))
+
+.cmatrix <- function(predicted, reference, print.tab) {
+  tab <- table(Predicted = predicted, Actual = reference)
+  if (print.tab) print(tab, comment = FALSE, quote = FALSE, print.gap = 4)
+  assign('TP', tab[1, 1], pos = parent.frame())
+  assign('FP', tab[1, 2], pos = parent.frame())
+  assign('FN', tab[2, 1], pos = parent.frame())
+  assign('TN', tab[2, 2], pos = parent.frame())
+}
+
+accuracy <- function(predicted, reference, print.tab = TRUE) {
+  .cmatrix(predicted, reference, print.tab)
+  (TP + TN) / (TP + FP + FN + TN)
+}
+
+precision <- function(predicted, reference, print.tab = TRUE) {
+  .cmatrix(predicted, reference, print.tab)
+  TP / (TP + FP)
+}
+
+recall <- function(predicted, reference, print.tab = TRUE) {
+  .cmatrix(predicted, reference, print.tab)
+  TP / (TP + FN)
+}
+
+specificity <- function(predicted, reference, print.tab = TRUE) {
+  .cmatrix(predicted, reference, print.tab)
+  TN / (TN + FP)
+}
+
+accuracy(data$y, data$y)
+precision(data$y, data$y)
+accuracy(data$y, data$y, print.tab = F)
+recall(data$y, data$y)
+
+evaluate_model <- function(predicted, reference, print.tab = TRUE) {
+  .cmatrix(predicted, reference, print.tab)
+  return(
+    c(
+      Accuracy    = (TP + TN) / (TP + FP + FN + TN),
+      Precision   = TP / (TP + FP),
+      Recall      = TP / (TP + FN),
+      Specificity = TN / (TN + FP),
+      'F1 Score'  = 2*TP / (2*TP + FP + FN)
+    )
+  )
+}
+
+evaluate_model(data$y, data$y)
+evaluate_model(
+  data$y,
+  sample(data$y, length(data$y))
+)
+
 tree_model <- tree(y ~ ., data_train)
 plot(tree_model)
 text(tree_model, pretty = 6)
 
 tree_pred = predict(tree_model, data_test, type = 'class')
 
+evaluate_model(tree_pred, data_test$y)
+
 (tab <- table(data_test$y, tree_pred))
 
-(F1 <- 2 * tab[2,2] / (2 * tab[2,2] + tab[1,2] + tab[2,1]))
+(F1 <- 2 * tab[1,1] / (2 * tab[1,1] + tab[2,1] + tab[1,2]))
 
 cv_tree = cv.tree(tree_model, FUN=prune.misclass)
 plot(cv_tree$size, cv_tree$dev, type="b")
 
-prune_model = prune.misclass(tree_model, best=3)
+prune_model = prune.misclass(tree_model, best=2)
 plot(prune_model)
 text(prune_model)
 print(prune_model)
-
-tree_pred1 <- predict(prune_model, data_test, type = 'class')
-(tab <- table(data_test$y, tree_pred1))
-(F1 <- 2 * tab[2,2] / (2 * tab[2,2] + tab[1,2] + tab[2,1]))
 
 rp <- rpart(y ~ ., data_train)
 prp(rp)
 fancyRpartPlot(rp)
 
+f1(rp, data_test, 'y')
+
 tree_model <- ctree(y ~ ., data_train)
+
+model <- rpart(y ~ ., data = data_train, xval = 30)
+fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+
+model <- rpart(
+  y ~ .,
+  data = data_train,
+  xval = 30,
+  parms = list(prior = c(.5, .5))
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+
+loss_matrix <- matrix(c(0, 1, 20, 0), ncol = 2)
+model <- rpart(
+  y ~ .,
+  data = data_train,
+  xval = 30,
+  parms = list(loss = loss_matrix)
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+
+loss_matrix <- matrix(c(0, 1, 2, 0), ncol = 2)
+model <- rpart(
+  y ~ .,
+  data = data_train,
+  xval = 30,
+  parms = list(
+    loss = loss_matrix,
+    prior = c(.5, .5)
+  )
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+
+drop_cols <- c('month', 'day_of_week')
+
+data_train_d <- select(data_train, -drop_cols)
+data_test_d <- select(data_test, -drop_cols)
+
+model <- rpart(
+  y ~ .,
+  data = data_train_d,
+  xval = 30,
+  parms = list(prior = c(.5, .5))
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test_d, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+
+loss_matrix <- matrix(c(0, 1, 5, 0), ncol = 2)
+model <- rpart(
+  y ~ .,
+  data = data_train_d,
+  xval = 30,
+  parms = list(
+    loss = loss_matrix
+  )
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+
+drop_cols <- c('month', 'day_of_week', 'euribor3m', 'nr.employed')
+data_train_d <- select(data_train, -drop_cols)
+data_test_d <- select(data_test, -drop_cols)
+
+loss_matrix <- matrix(c(0, 1, 5, 0), ncol = 2)
+model <- rpart(
+  y ~ .,
+  data = data_train_d,
+  xval = 30,
+  parms = list(
+    loss = loss_matrix
+  )
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
