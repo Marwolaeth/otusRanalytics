@@ -8,8 +8,7 @@ pacman::p_load(
   tree,
   rpart,
   rpart.plot,
-  rattle,
-  caret
+  rattle
 )
 
 if (!file.exists('data/bank-additional-full.csv')) {
@@ -44,21 +43,21 @@ summary(data)
 # Согласно странице описания набора данных:
 # http://archive.ics.uci.edu/ml/datasets/Bank+Marketing
 data <- data %>%
-  mutate(
-    education_info = if_else(
-      education == 'unknown',
-      'unknown',
-      'known'
-    )
-  ) %>%
-  mutate(
-    education = if_else(
-      education != 'unknown',
-      education,
-      NA_character_
-      # Иначе ошибка: несовпадение классов
-    )
-  ) %>%
+  # mutate(
+  #   education_info = if_else(
+  #     education == 'unknown',
+  #     'unknown',
+  #     'known'
+  #   )
+  # ) %>%
+  # mutate(
+  #   education = if_else(
+  #     education != 'unknown',
+  #     education,
+  #     NA_character_
+  #     # Иначе ошибка: несовпадение классов
+  #   )
+  # ) %>%
   # 999 means client was not previously contacted
   # распространенная метка для пропущенных значений, например, в SPSS
   # i.e. previous == 0 & poutcome == "nonexistent"
@@ -71,21 +70,21 @@ data <- data %>%
     )
   ) %>%
   mutate_if(is.character, as.factor) %>%
-  mutate(
-    education = factor(
-      education,
-      ordered = TRUE,
-      levels = c(
-        'illiterate',
-        'basic.4y',
-        'basic.6y',
-        'basic.9y',
-        'high.school',
-        'professional.course',
-        'university.degree'
-      )
-    )
-  ) %>%
+  # mutate(
+  #   education = factor(
+  #     education,
+  #     ordered = TRUE,
+  #     levels = c(
+  #       'illiterate',
+  #       'basic.4y',
+  #       'basic.6y',
+  #       'basic.9y',
+  #       'high.school',
+  #       'professional.course',
+  #       'university.degree'
+  #     )
+  #   )
+  # ) %>%
   # this input should only be included for benchmark purposes
   # and should be discarded if
   # the intention is to have a realistic predictive model
@@ -315,3 +314,124 @@ model <- rpart(
 fancyRpartPlot(model)
 pred <- predict(model, data_test, type = 'class')
 evaluate_model(predicted = pred, reference = data_test$y)
+
+# best so far
+loss_matrix <- matrix(c(0, 3, 4, 0), ncol = 2)
+model <- rpart(
+  y ~ .,
+  data = data_train_d,
+  xval = 60,
+  parms = list(
+    loss = loss_matrix,
+    split = 'gini',
+    prior = c(.25, .75)
+  ),
+  control = list(
+    minbucket = 100,
+    minsplit  = 300,
+    cp = 0.001
+  )
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test_d, type = 'class')
+evaluate_model(predicted = pred, reference = data_test_d$y)
+###
+
+loss_matrix <- matrix(c(0, 3, 7, 0), ncol = 2)
+model <- rpart(
+  y ~ .,
+  data = data_train_d,
+  xval = 60,
+  parms = list(
+    loss = loss_matrix,
+    split = 'gini',
+    prior = c(.25, .75)
+  ),
+  control = list(
+    minbucket = 100,
+    minsplit  = 300,
+    cp = 0.001
+  )
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test_d, type = 'class')
+evaluate_model(predicted = pred, reference = data_test_d$y)
+recall(pred, data_test_d$y)
+
+data_target <- dlookr::target_by(data, y)
+
+eda_report(data_target, target = 'y')
+
+dlookr::relate(data_target, emp.var.rate)
+ggplot(data, aes(x = emp.var.rate, fill = y)) +
+  geom_density(alpha = .4)
+# it works
+# https://www.quora.com/What-is-meant-by-employment-variation-rate-Does-it-affect-in-any-way-the-financial-decisions-that-an-individual-takes
+# https://www.euribor-rates.eu/en/what-is-euribor/
+dlookr::relate(data_target, cons.price.idx)
+ggplot(data, aes(x = cons.price.idx, fill = y)) +
+  geom_density(alpha = .4)
+dlookr::relate(data_target, previous)
+dlookr::relate(data_target, cons.conf.idx)
+rm(data_target)
+
+bank_tree <- function(
+  pars = c(
+    fp_loss = 3,
+    fn_loss = 4,
+    prior_y = .25,
+    minbckt = 100,
+    minsplt = 300,
+    complexity = .001 
+  )
+) {
+  loss_matrix <- matrix(
+    c(0, pars['fp_loss'], pars['fn_loss'], 0),
+    ncol = 2,
+    byrow = TRUE
+  )
+  model <- rpart(
+    y ~ .,
+    data = data_train_d,
+    xval = 60,
+    parms = list(
+      loss = loss_matrix,
+      split = 'gini',
+      prior = c(pars['prior_y'], 1 - pars['prior_y'])
+    ),
+    control = list(
+      minbucket = pars['minbckt'],
+      minsplit  = pars['minsplt'],
+      cp = pars['complexity']
+    )
+  )
+  pred <- predict(model, data_test_d, type = 'class')
+  scores <- evaluate_model(predicted = pred, reference = data_test_d$y)
+  return(scores['F1 Score'])
+}
+
+bank_par <- optim(
+  c(
+    3,
+    4,
+    .25,
+    100,
+    300,
+    .001
+  ),
+  fn = bank_tree,
+  lower = c(0, 0, 0, 10, 20, -0.001),
+  upper = c(6, 10, 1, 500, 1000, .1),
+  method = 'L-BFGS-B'
+)
+
+bank_tree(
+  c(
+    fp_loss = 3,
+    fn_loss = 4,
+    prior_y = .25,
+    minbckt = 100,
+    minsplt = 300,
+    complexity = .001 
+  )
+)
