@@ -386,7 +386,7 @@ bank_tree <- function(
   )
 ) {
   loss_matrix <- matrix(
-    c(0, pars['fp_loss'], pars['fn_loss'], 0),
+    c(0, pars[1], pars[2], 0),
     ncol = 2,
     byrow = TRUE
   )
@@ -397,12 +397,12 @@ bank_tree <- function(
     parms = list(
       loss = loss_matrix,
       split = 'gini',
-      prior = c(pars['prior_y'], 1 - pars['prior_y'])
+      prior = c(pars[3], 1 - pars[3])
     ),
     control = list(
-      minbucket = pars['minbckt'],
-      minsplit  = pars['minsplt'],
-      cp = pars['complexity']
+      minbucket = pars[4],
+      minsplit  = pars[5],
+      cp = pars[6]
     )
   )
   pred <- predict(model, data_test_d, type = 'class')
@@ -421,9 +421,12 @@ bank_par <- optim(
   ),
   fn = bank_tree,
   lower = c(0, 0, 0, 10, 20, -0.001),
-  upper = c(6, 10, 1, 500, 1000, .1),
-  method = 'L-BFGS-B'
+  upper = c(6, 10, 1, 500, 1000, .4),
+  method = 'L-BFGS-B',
+  control = list(fnscale = -1)
 )
+
+bank_par
 
 bank_tree(
   c(
