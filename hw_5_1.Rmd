@@ -23,7 +23,8 @@ pacman::p_load(
   tree,
   rpart,
   rpart.plot,
-  rattle
+  rattle,
+  ModelMetrics
 )
 
 # checkpoint('2019-11-24')
@@ -90,21 +91,21 @@ summary(data)
 
 ```{r data_preprocess}
 data <- data %>%
-  mutate(
-    education_info = if_else(
-      education == 'unknown',
-      'unknown',
-      'known'
-    )
-  ) %>%
-  mutate(
-    education = if_else(
-      education != 'unknown',
-      education,
-      NA_character_
-      # Иначе ошибка: несовпадение классов
-    )
-  ) %>%
+  # mutate(
+  #   education_info = if_else(
+  #     education == 'unknown',
+  #     'unknown',
+  #     'known'
+  #   )
+  # ) %>%
+  # mutate(
+  #   education = if_else(
+  #     education != 'unknown',
+  #     education,
+  #     NA_character_
+  #     # Иначе ошибка: несовпадение классов
+  #   )
+  # ) %>%
   # 999 means client was not previously contacted
   # распространенная метка для пропущенных значений, например, в SPSS
   # i.e. previous == 0 & poutcome == "nonexistent"
@@ -117,21 +118,21 @@ data <- data %>%
     )
   ) %>%
   mutate_if(is.character, as.factor) %>%
-  mutate(
-    education = factor(
-      education,
-      ordered = TRUE,
-      levels = c(
-        'illiterate',
-        'basic.4y',
-        'basic.6y',
-        'basic.9y',
-        'high.school',
-        'professional.course',
-        'university.degree'
-      )
-    )
-  ) %>%
+  # mutate(
+  #   education = factor(
+  #     education,
+  #     ordered = TRUE,
+  #     levels = c(
+  #       'illiterate',
+  #       'basic.4y',
+  #       'basic.6y',
+  #       'basic.9y',
+  #       'high.school',
+  #       'professional.course',
+  #       'university.degree'
+  #     )
+  #   )
+  # ) %>%
   # This input should only be included for benchmark purposes
   # and should be discarded if
   # the intention is to have a realistic predictive model
@@ -195,6 +196,7 @@ data_test <- data %>%
   select(-id)
 # Избавляемся от колонки id, которая является лишней при обучении модели
 data_train <- select(data_train, -id)
+data <- select(data, -id)
 
 # Убедимся, что разбиение корректно
 nrow(data_train) + nrow(data_test) == nrow(data)
@@ -289,6 +291,205 @@ evaluate_model(pred, data$y, print.tab = FALSE)
 
 Для анализа мы воспользуемся функцией построения деревьев классификации из пакета `rpart`.
 
-```{r tree_01}
+#### 1. Базовая модель
 
+```{r tree_01_default}
+model <- rpart(
+  y ~ .,
+  data = data_train,
+  xval = 30
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+```
+
+Модель имеет очень низкий показатель F1, очень низкую полноту и неудовлетворительную точность, зато очень высокую специфичность, т. е. способность правильно предсказывать отрицательный результат. Вероятно, это связано с низкой частотностью позитивных результатов в выборке.
+
+В таких случаях советуют корректировать алгоритм одним из таких путей:
+
+1. Повысить априорную вероятность редкого исхода
+2. Задать в матрице потерь более высокое значение для ложно-отрицательной классификации
+3. Стратифицированная выборка с повышением вероятности редкого исхода.
+4. Присвоение большего веса наблюдениям с редким классом.
+
+Также предсказательную мощность можно повысить, если разрешить модели «вырастить» большое разветвленное дерево, а затем сократить его прунингом. Для большего ветвления можно сократить минимальное количество наблюдений в конечных листьях или «освободить» критерий сложности `complexity parameter`.
+
+Кроме того, уберем из пространства признаков заведомо бессмысленные (хотя и мощные, как покажет разведывательный анализ данных `dlookr::eda_report()`) предикторы: месяц и день недели.
+
+```{r data_reduce}
+drop_cols <- c('month', 'day_of_week')
+data_train <- select(data_train, -drop_cols)
+data_test <- select(data_test, -drop_cols)
+```
+
+#### 2. Априорная вероятность
+
+```{r tree_02_priors}
+model <- rpart(
+  y ~ .,
+  data = data_train,
+  xval = 30,
+  parms = list(prior = c(.25, .75))
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+```
+
+Комплексный показатель качества модели стал намного выше, а специфичность сократилась из-за повышения вероятности классифицировать наблюдение как положительное.
+
+#### 3. Матрица потерь
+
+```{r tree_03_priors_loss}
+lossmatrix <- matrix(c(0, 3, 5, 0))
+model <- rpart(
+  y ~ .,
+  data = data_train,
+  xval = 30,
+  parms = list(
+    prior = c(.25, .75),
+    loss  = lossmatrix
+  )
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+```
+
+Штраф за ложноотрицательную классификацию может радикально повысить полноту предсказаний за счет остальных показатель качества.
+
+#### 4. Альтернативная выборка
+
+```{r tree_04_biased-sample}
+set.seed(1111)
+data_train_b <- data_train %>%
+  group_by(y) %>%
+  group_split() %>%
+  map2_df(c(2000, 4000), ~ sample_n(.x, size = .y))
+
+model <- rpart(
+  y ~ .,
+  data = data_train_b,
+  xval = 30
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+```
+
+Стратифицированная выборка также повышает полноту классификации, но не ее общее качество.
+
+#### 5. Вес для редкого класса
+
+```{r tree_05_weights}
+wghts <- ifelse(data_train$y == 'yes', 5, 1)
+model <- rpart(
+  y ~ .,
+  data = data_train,
+  weights = wghts,
+  xval = 30
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+```
+
+Снова нет улучшения. Как и предыдущие способы, повышение веса наблюдений с редким классом повышает априорную вероятность и, следовательно, полноту классификации по этому классу.
+
+#### 6. Прунинг
+
+Воспользуемся советом из статьи на [GormAnalysis](https://www.gormanalysis.com/blog/decision-trees-in-r-using-rpart/):
+
+> As a rule of thumb, it’s best to prune a decision tree using the cp of smallest tree that is within one standard deviation of the tree with the smallest xerror.
+
+```{r tree_06_pruning}
+lossmatrix <- matrix(c(0, 3, 5, 0))
+model <- rpart(
+  y ~ .,
+  data = data_train,
+  xval = 30,
+  parms = list(
+    prior = c(.25, .75),
+    loss  = lossmatrix
+  ),
+  control = list(
+    cp = -1
+  )
+)
+```
+
+Можно посмотреть важность переменных для классификации:
+
+```{r variable_importance}
+model$variable.importance
+```
+
+Наиболее важными для модели являются макроэкономические показатели на момент переговоров: **количество сотрудников** (более точного определения показателя найти не удалось), **индекс EURIBOR** — ставка, по которой банки одалживают средства на межбанковском рынке Европейских стран, **Индекс потребительской уверенности**, **Коэффициент вариации занятости** (показатель текучести кадров по экономике в целом) и др.
+
+```{r tree_06-1_pruning-prune}
+(cps <- model$cptable %>%
+  as_tibble() %>%
+  set_names(c('CP', 'nsplit', 'rel_error', 'xerror', 'xstd')))
+
+(cp_fit <- cps %>%
+  filter(
+    xerror <= (
+      first(xerror, order_by = xerror) + first(xstd, order_by = xerror)
+    ),
+    nsplit > 1
+  ) %>%
+  arrange(nsplit) %>%
+  slice(1) %>%
+  pull(CP))
+
+model <- prune(model, cp = cp_fit)
+
+fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+```
+
+Пока это наилучший результат, но и его нельзя считать удовлетворительным.
+
+```{r}
+best_so_far <- model
+```
+
+#### 7. Мультиколлинеарность
+
+Наконец, можно попытаться избавиться от сильно коррелирующих друг с другом и потому избыточных переменных — экономических показателей, кроме текучести рабочей силы:
+
+```{r variables_cor}
+dlookr::correlate(select(data, 15:19))
+```
+
+```{r tree_07_drop}
+drop_cols <- c('nr.employed', 'cons.price.idx', 'euribor3m', 'cons.conf.idx')
+data_train_d <- select(data_train, -drop_cols)
+data_test_d <- select(data_test, -drop_cols)
+
+wghts <- ifelse(data_train_d$y == 'yes', 5, 1)
+model <- rpart(
+  y ~ .,
+  data = data_train_d,
+  weights = wghts,
+  xval = 30
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test_d, type = 'class')
+evaluate_model(predicted = pred, reference = data_test_d$y)
+```
+
+Результат уступает лучшему из уже достигнутых.
+
+## Заключение
+
+Вероятно, данные сложно поддаются классификации с использованием решающих деревьев. Также сказывается отсутствие достаточных знаний и опыта. Предполагаем, что при реальном использовании подобной модели следовало бы максимизировать именно полноту классификации, если выгода от привлеченного депозита превышает стоимость неудачных звонков.
+
+Сами авторы набора данных в своей [статье](http://media.salford-systems.com/video/tutorial/2015/targeted_marketing.pdf) не указывают решающие деревья в качестве лучшего алгоритма классификации их данных. Кстати, в оригинальном материале также использовался пакет `rpart`, а основной метрикой качества была **AUC**, которая для метода решающих деревьев оказалась равна ≈ 0,757. Нам почти удалось повторить этот результат:
+
+```{r model_auc}
+pred <- predict(best_so_far, data_test, type = 'class')
+ModelMetrics::auc(actual = data_test$y, predicted = pred)
 ```

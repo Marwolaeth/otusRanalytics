@@ -406,7 +406,11 @@ bank_tree <- function(
     )
   )
   pred <- predict(model, data_test_d, type = 'class')
-  scores <- evaluate_model(predicted = pred, reference = data_test_d$y)
+  scores <- evaluate_model(
+    predicted = pred,
+    reference = data_test_d$y,
+    print.tab = FALSE
+  )
   return(scores['F1 Score'])
 }
 
@@ -438,3 +442,164 @@ bank_tree(
     complexity = .001 
   )
 )
+
+drop_cols <- c(
+  'campaign',
+  'pdays',
+  'previous',
+  'cons.price.idx',
+  'nr.employed',
+  'month',
+  'day_of_week',
+  'housing',
+  'loan'
+)
+
+data_train_d <- select(data_train, -drop_cols)
+data_test_d <- select(data_test, -drop_cols)
+
+model <- rpart(
+  y ~ .,
+  data = data_train_d,
+  xval = 30
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test_d, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+
+model <- rpart(
+  y ~ .,
+  data = data_train,
+  xval = 30,
+  parms = list(prior = c(.5, .5))
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+
+lossmatrix <- matrix(c(0, 3, 5, 0))
+model <- rpart(
+  y ~ .,
+  data = data_train,
+  xval = 30,
+  parms = list(
+    prior = c(.25, .75),
+    loss  = lossmatrix
+  )
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+
+data_train_b <- data_train %>%
+  group_by(y) %>%
+  group_split() %>%
+  map2_df(c(2000, 4000), ~ sample_n(.x, size = .y))
+
+model <- rpart(
+  y ~ .,
+  data = data_train_b,
+  xval = 30
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+
+dlookr::correlate(select(data, 15:19))
+
+drop_cols <- c('month', 'day_of_week')
+data_train_d <- select(data_train, -drop_cols)
+data_test_d <- select(data_test, -drop_cols)
+wghts <- ifelse(data_train_d$y == 'yes', 5, 1)
+model <- rpart(
+  y ~ .,
+  data = data_train_d,
+  weights = wghts,
+  xval = 30
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test_d, type = 'class')
+evaluate_model(predicted = pred, reference = data_test_d$y)
+
+
+lossmatrix <- matrix(c(0, 3, 5, 0))
+model <- rpart(
+  y ~ .,
+  data = data_train,
+  xval = 30,
+  parms = list(
+    prior = c(.25, .75),
+    loss  = lossmatrix
+  ),
+  control = list(
+    cp = -1
+  )
+)
+# fancyRpartPlot(model)
+pred <- predict(model, data_test, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+model$variable.importance
+
+# Приходится делать data.frame самим
+cps <- model$cptable %>%
+  as_tibble() %>%
+  set_names(c('CP', 'nsplit', 'rel_error', 'xerror', 'xstd'))
+cps
+
+cp_fit <- cps %>%
+  filter(
+    xerror <= (
+      first(xerror, order_by = xerror) + first(xstd, order_by = xerror)
+    ),
+    nsplit > 1
+  ) %>%
+  arrange(nsplit) %>%
+  slice(1) %>%
+  pull(CP)
+model <- prune(model, cp = cp_fit)
+
+dlookr::correlate(select(data, 15:19))
+
+drop_cols <- c('nr.employed', 'cons.price.idx', 'euribor3m', 'cons.conf.idx')
+data_train_d <- select(data_train, -drop_cols)
+data_test_d <- select(data_test, -drop_cols)
+
+lossmatrix <- matrix(c(0, 3, 5, 0))
+model <- rpart(
+  y ~ .,
+  data = data_train_d,
+  xval = 30,
+  parms = list(
+    prior = c(.25, .75),
+    loss  = lossmatrix
+  ),
+  control = list(
+    cp = -1
+  )
+)
+fancyRpartPlot(model)
+pred <- predict(model, data_test_d, type = 'class')
+evaluate_model(predicted = pred, reference = data_test$y)
+model$variable.importance
+
+cps <- model$cptable %>%
+  as_tibble() %>%
+  set_names(c('CP', 'nsplit', 'rel_error', 'xerror', 'xstd'))
+cps
+
+cp_fit <- cps %>%
+  filter(
+    xerror <= (
+      first(xerror, order_by = xerror) + first(xstd, order_by = xerror)
+    ),
+    nsplit > 1
+  ) %>%
+  arrange(nsplit) %>%
+  slice(1) %>%
+  pull(CP)
+model <- prune(model, cp = cp_fit)
+
+install.packages('ModelMetrics', )
+library(ModelMetrics)
+
+auc(model)
