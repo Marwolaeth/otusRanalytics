@@ -1,0 +1,363 @@
+---
+title: "Home work 5_2"
+author: "Andrej Pawluczenko"
+date: "12/1/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+*Установка и загрузка библиотек:*
+
+```{r packages_load, message=FALSE, warning=FALSE}
+if(!require('pacman')) install.packages('pacman')
+pacman::p_load(
+  tidyverse,
+  readr,
+  broom,
+  rpart,
+  rpart.plot,
+  rattle,
+  randomForest,
+  ModelMetrics,
+  caret
+)
+
+get_subset <- function(x, .which) {
+  '['(x, .which)
+}
+```
+
+## Данные
+
+Будет использоваться тот же [набор](http://archive.ics.uci.edu/ml/datasets/Bank+Marketing) данных по банковскому телемаркетингу, что и в предыдущем задании. Так мы сможем сравнить предсказательную силу разных моделей.
+
+*Скачивание данных:*
+
+```{r data_download}
+if (!file.exists('data/bank-additional-full.csv')) {
+  if (!file.exists('data/bank-additional.zip')) {
+    if (!dir.exists('data')) dir.create('data')
+    download.file(
+      'http://archive.ics.uci.edu/ml/machine-learning-databases/00222/bank-additional.zip',
+      destfile = 'data/bank-additional.zip'
+    )
+  }
+  unzip(
+    'data/bank-additional.zip',
+    files = c(
+      'bank-additional/bank-additional-full.csv',
+      'bank-additional/bank-additional-names.txt'
+    ),
+    exdir = 'data',
+    junkpaths = TRUE
+  )
+}
+```
+
+```{r model_evaluation}
+.cmatrix <- function(predicted, reference, print.tab, success.index = 2) {
+  si <- as.integer(success.index)
+  fi <- setdiff(c(1L, 2L), si)
+  tab <- table(Predicted = predicted, Actual = reference)
+  if (print.tab) print(tab, comment = FALSE, quote = FALSE, print.gap = 4)
+  assign('TP', tab[si, si], pos = parent.frame())
+  assign('FP', tab[si, fi], pos = parent.frame())
+  assign('FN', tab[fi, si], pos = parent.frame())
+  assign('TN', tab[fi, fi], pos = parent.frame())
+}
+
+# Единая функция для расчета всех индексов + показатель F1
+evaluate_model <- function(
+  pred,
+  reference,
+  # Currently not used
+  measures = c('accuracy', 'precision', 'recall', 'specificity', 'f', 'f1'),
+  print.tab = TRUE,
+  success.index = 2
+) {
+  require(ModelMetrics)
+  if (print.tab) cat('\nConfusion matrix:\n\n')
+  .cmatrix(pred, reference, print.tab, success.index)
+  if (print.tab) cat('\n\nModel scores:\n\n')
+  return(
+    c(
+      Accuracy    = (TP + TN) / (TP + FP + FN + TN),
+      Precision   = TP / (TP + FP),
+      Recall      = TP / (TP + FN),
+      Specificity = TN / (TN + FP),
+      'F1 Score'  = 2*TP / (2*TP + FP + FN),
+      AUC         = auc(actual = reference, predicted = pred)
+    )
+  )
+}
+```
+
+```{r data_load, message=FALSE}
+data <- read_delim(
+  'data/bank-additional-full.csv',
+  delim = ';',
+  locale = locale(decimal_mark = '.')
+)
+glimpse(data)
+```
+
+```{r data_preprocess}
+data <- data %>%
+# 999 means client was not previously contacted
+# распространенная метка для пропущенных значений, например, в SPSS
+# i.e. previous == 0 & poutcome == "nonexistent"
+# see: tapply(data$pdays, data$poutcome, mean)
+  mutate_if(is.character, as.factor) %>%
+  # This input should only be included for benchmark purposes
+  # and should be discarded if
+  # the intention is to have a realistic predictive model
+  select(-duration)
+```
+
+## Анализ
+
+```{r analysis_split}
+set.seed(1111)
+training_samples <- data %>%
+  pull(y) %>%
+  createDataPartition(p = 0.7, list = FALSE)
+
+# Выбираем уровни факторов, которых в наборе данных меньше 40
+rare_values <- data %>%
+  select_if(is.factor) %>%
+  map(table) %>%
+  map(~ subset(., subset = (. == min(.)), drop = FALSE)) %>%
+  get_subset(map_lgl(., ~ . <= 40)) %>%
+  map_chr(names)
+rare_values
+
+set.seed(1111)
+rare_observations <- map2_df(
+  names(rare_values),
+  rare_values,
+  ~ filter(data, get(.x) == .y) %>% sample_n(1)
+)
+rare_observations
+
+data_train  <- data[ training_samples, ] %>% union(rare_observations)
+data_test   <- data[-training_samples, ] %>% union(rare_observations)
+
+rm(rare_values, rare_observations, training_samples)
+```
+
+Некоторые значения факторов представлены в данных настолько редко, что могут встречаться или только в тренировочном, или только в тестовом наборе данных, что вызывает ошибку при предсказании значений тестового набора. Попробуем продублировать редкие значения в каждом из наборов.
+
+### Логистическая регрессия
+
+С предыдущего задания известно, что в данных содержатся экономические индикаторы, которые сильно коррелируют между собой, что может негативно повлиять на модель логистической регрессии. Попробуем что-то с этим сделать.
+
+```{r model_logit_initial}
+model_init <- glm(y ~ ., data = data_train, family = binomial)
+# model_init
+
+model_init_details <- broom::augment(
+  model_init,
+  newdata = data_test,
+  type.predict = 'response'
+) %>%
+  mutate(y_hat = factor(if_else(.fitted >= .5, 'yes', 'no')))
+
+evaluate_model(model_init_details$y_hat, model_init_details$y)
+```
+
+Первая модель получилась неудачной. Посмотрим, сделает ли ее лучше устранение мультиколлинеарности.
+
+> I [believe](https://stats.stackexchange.com/a/112443) you have ran into perfect multicollinearity
+
+```{r model_logit_1}
+# Извлекаем названия переменных, связанных с полной коллинеарностью,
+# которые помещены в названия строк матрицы "Complete" в значении
+# результата функции alias()
+multicor <- alias(model_init) %>%
+  getElement('Complete') %>%
+  dimnames() %>%
+  getElement(1) %>%
+  unique() %>%
+  map(
+    ~ str_detect(., names(data))
+  ) %>%
+  map_chr(~ names(data)[.])
+multicor
+
+frml <- formula(
+  paste(
+    'y ~ .',
+    paste(
+      map_chr(
+        multicor,
+        ~ paste0('-', .)
+      ),
+      collapse = ' '
+    )
+  )
+)
+frml
+
+model_init <- glm(frml, data = data_train, family = binomial)
+# model_init
+
+model_init_details <- broom::augment(
+  model_init,
+  newdata = data_test,
+  type.predict = 'response'
+) %>%
+  mutate(y_hat = factor(if_else(.fitted >= .5, 'yes', 'no')))
+
+evaluate_model(model_init_details$y_hat, model_init_details$y)
+
+car::vif(model_init)
+
+model_init_vif <- car::vif(model_init) %>%
+  as.data.frame() %>%
+  rownames_to_column('term') %>%
+  as_tibble() %>%
+  select(term, GVIF)
+model_init_vif
+
+useless_vars <- model_init_vif %>%
+  filter(!(term %in% c('month', 'euribor3m', 'emp.var.rate')) & GVIF > 10) %>%
+  pull(term) %>%
+  c(multicor)
+useless_vars
+
+frml <- formula(
+  paste(
+    'y ~ .',
+    paste(
+      map_chr(
+        useless_vars,
+        ~ paste0('-', .)
+      ),
+      collapse = ' '
+    )
+  )
+)
+frml
+
+model1 <- glm(frml, data = data_train, family = binomial)
+
+model_details <- broom::augment(
+  model1,
+  newdata = data_test,
+  type.predict = 'response'
+) %>%
+  mutate(y_hat = factor(if_else(.fitted >= .5, 'yes', 'no')))
+
+evaluate_model(model_details$y_hat, model_details$y)
+```
+
+После удаления нескольких сильных, но коррелирующих друг с другом предикторов модель стала слабее. Но что, если дело в пороге округления?
+
+Для определения оптимального порога округления (при незнакомстве с готовыми алгоритмами) использовались решающие деревья с предсказанной вероятностью класса в качестве предиктора и с матрицей потерь, штрафующей ложноотрицательные предсказания. Кроме того, 
+
+Не будем вдаваться в подробности подбора параметров. Показатель AUC у лучшей из получившихся моделей ≈ 0,73.
+
+```{r model_logit_2}
+(insignificant_predictors <- model1 %>%
+    tidy() %>%
+    filter(p.value >= .05))
+
+(insignificant_vars <- insignificant_predictors %>%
+  filter(term %in% names(data_train)) %>%
+  pull(term)
+)
+
+(useless_vars <- c(useless_vars, insignificant_vars))
+
+frml <- formula(
+  paste(
+    'y ~ .',
+    paste(
+      map_chr(
+        useless_vars,
+        ~ paste0('-', .)
+      ),
+      collapse = ' '
+    )
+  )
+)
+frml
+
+rm(
+  list = c(
+    grep('(^model)|(^insig)', ls(), value = TRUE),
+    'multicor',
+    'useless_vars'
+  )
+)
+
+wghts <- ifelse(data_train$y == 'yes', 3, 1)
+model3 <- glm(frml, data = data_train, family = binomial, weights = wghts)
+
+model_train_details <- broom::augment(
+  model3,
+  type.predict = 'response'
+)
+lossmatrix <- matrix(c(0, 5, 2, 0))
+y_rounding <- rpart(
+  y ~ .fitted,
+  data = model_train_details,
+  parms = list(
+    loss = lossmatrix,
+    prior = c(.5, .5)
+  )
+)
+fancyRpartPlot(y_rounding)
+
+model_details <- broom::augment(
+  model3,
+  newdata = data_test,
+  type.predict = 'response'
+) %>%
+  mutate(y_hat = factor(if_else(.fitted >= .39, 'yes', 'no')))
+
+evaluate_model(model_details$y_hat, model_details$y)
+```
+
+Наконец, можно посмотреть, как влияют отдельные переменные на вероятность успеха в рамках нашей относительно успешной модели:
+
+```{r variable_importance_logit}
+broom::tidy(model3) %>%
+  filter(p.value < .5) %>%
+  filter(term != '(Intercept)') %>%
+  mutate(
+    odds_ratio = exp(estimate),
+    p.value = round(p.value, 4)
+  ) %>%
+  arrange(desc(odds_ratio)) %>%
+  knitr::kable()
+```
+
+```{r cleanup_1, echo=FALSE,message=FALSE}
+rm(
+  list = setdiff(ls(), grep('(^dat)|(^eval)|(^get)', ls(), value = TRUE))
+)
+```
+
+### Случайный лес
+
+```{r model_randomForest_1}
+rf <- randomForest(
+  y ~ .,
+  data_train,
+  ntree = 170,
+  cutoff = c(.8, .2),
+  classwt = c(3, 1),
+  mtry = 3,
+  do.trace = 10
+)
+# str(rf)
+
+rfpred <- predict(rf, data_test, type = 'class')
+
+evaluate_model(rfpred, data_test$y)
+randomForest::importance(rf)
+```

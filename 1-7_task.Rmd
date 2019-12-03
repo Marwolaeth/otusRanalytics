@@ -1,0 +1,59 @@
+---
+title: "task"
+author: "Andrej Pawluczenko"
+date: "8/27/2019"
+output: html_document
+---
+
+## Практика оформления R Markdown
+
+Пакет [*knitr*](https://github.com/yihui/knitr) позволяет вставлять куски кода - чанки - прямо в готовый документ и выполнять их согласно канонам **воспроизводимых исследований**.
+
+Текст в R Markdown может быть отформатирован в виде
+
+* маркир-
+* ованного
+* или
+
+1. нумерова
+2. нного
+3. списка
+  1) под
+  2) спис
+  3) ка
+  
+```{r, out.width=400}
+
+knitr::include_graphics("https://cdn4.iconfinder.com/data/icons/reports-and-analytics-3/512/116-512.png")
+
+
+
+```
+
+Возьмем для тестирования датасет airmiles из пакета datasets
+
+<!-- Нажимаем Ctrl+Alt+I для нового чанка. загружаем airmiles, смотрим его структуру, summary и строим график -->
+
+```{r}
+data("airmiles")
+str(airmiles)
+summary(airmiles)
+plot(airmiles)
+```
+
+
+Данный датасет содержит `r data('airmiles'); nrow(airmiles)` наблюдений.
+
+<!-- перед заголовком Stop строим горизонтальную линию  -->
+
+---
+
+##STOP
+
+$$N = \sum^n_{i=1}\frac{X_i}{\sqrt{b^2 - 4ac}}$$
+
+```{python eval=FALSE, include=FALSE}
+import pandas as pd
+data = pd.read_csv("https://raw.githubusercontent.com/uiuc-cse/data-fa14/gh-pages/data/iris.csv")
+data[0:4]
+```

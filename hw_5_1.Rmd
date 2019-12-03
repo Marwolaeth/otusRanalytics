@@ -318,9 +318,9 @@ evaluate_model(predicted = pred, reference = data_test$y)
 Кроме того, уберем из пространства признаков заведомо бессмысленные (хотя и мощные, как покажет разведывательный анализ данных `dlookr::eda_report()`) предикторы: месяц и день недели.
 
 ```{r data_reduce}
-drop_cols <- c('month', 'day_of_week')
-data_train <- select(data_train, -drop_cols)
-data_test <- select(data_test, -drop_cols)
+# drop_cols <- c('month', 'day_of_week')
+# data_train <- select(data_train, -drop_cols)
+# data_test <- select(data_test, -drop_cols)
 ```
 
 #### 2. Априорная вероятность
