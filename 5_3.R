@@ -24,6 +24,9 @@ str(train_labels)
 str(test_images)
 str(test_labels)
 
+ntrain <- nrow(train_images)
+ntest  <- nrow(test_labels)
+
 train_images <- train_images[1:500,,]
 train_labels <- train_labels[1:500]
 test_images <- test_images[1:200,,]

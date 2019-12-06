@@ -1,0 +1,35 @@
+---
+title: "Home work 5_2"
+author: "Andrej Pawluczenko"
+date: "02.12.2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages_load, message=FALSE, warning=FALSE}
+if(!require('pacman')) install.packages('pacman')
+pacman::p_load(
+  purrr,
+  tictoc
+)
+pacman::p_load_gh(
+  'rstudio/reticulate',
+  'rstudio/tensorflow',
+  'rstudio/keras'
+)
+```
+
+Подключение Tensorflow и Keras занимает какое-то время:
+
+```{r install_tools, message=FALSE, warning=FALSE}
+tic()
+tensorflow::install_tensorflow()
+install_keras()
+toc()
+```
+
+Тестирование на сокращенном наборе данных:
+
