@@ -1,6 +1,7 @@
 if(!require('pacman')) install.packages('pacman')
 pacman::p_load(
-  purrr
+  purrr,
+  tictoc
 )
 pacman::p_load_gh(
   'rstudio/reticulate',
@@ -10,10 +11,11 @@ pacman::p_load_gh(
 options(verbose = TRUE)
 
 tensorflow::install_tensorflow()
-install_keras()
+install_keras(method = 'conda')
 
 mnist <- dataset_mnist()
 str(mnist, 2)
+class(mnist)
 train_images <- mnist$train$x
 train_labels <- mnist$train$y
 test_images <- mnist$test$x
@@ -27,10 +29,10 @@ str(test_labels)
 ntrain <- nrow(train_images)
 ntest  <- nrow(test_labels)
 
-train_images <- train_images[1:500,,]
-train_labels <- train_labels[1:500]
-test_images <- test_images[1:200,,]
-test_labels <- test_labels[1:200]
+train_images <- train_images[sample(ntrain, 500, replace = FALSE),,]
+train_labels <- train_labels[sample(ntrain, 500, replace = FALSE),,]
+test_images <- test_images[sample(ntest, 200, replace = FALSE)]
+test_labels <- test_labels[sample(ntest, 200, replace = FALSE)]
 
 network <- keras_model_sequential() %>% 
   layer_dense(units = 512, activation = 'relu', input_shape = c(28 * 28)) %>% 

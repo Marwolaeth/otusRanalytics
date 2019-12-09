@@ -27,3 +27,4 @@ x <- heights %>% filter(sex == 'Male') %>% mutate(h = height * 2.54) %>% pull(h)
 h <- rnorm(800, mean(x), sd(x))
 
 mean(x <= 175)
+
