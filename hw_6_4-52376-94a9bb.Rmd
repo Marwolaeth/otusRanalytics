@@ -1,0 +1,131 @@
+---
+title: "hw_6_4"
+author: "Бикмаев Руслан"
+date: "17 12 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(verbose = T)
+```
+## ДЗ 6.4
+
+ Для упражнения используются  данные so.csv, прекрепленные к материалам прошлого урока
+1. Загрузите данные.
+2. Сделайте выборку от 1000 строк произвольно выбранного пользователя ("Шелест", любо любого другого).
+3. Выполните необходимую предобработку данных (разбивка по предложениям, нарезка на слова, очистка от  строк, содержащих нечитаемые символы, либо отдельных символов).
+4. Произведите кодирование слов в индексы для keras с настройками словарного запаса 10000.
+5. Сохраните подготовленный тензор в файл в домашней папке и приложите его копию к коду домашнего задания в чат. Для сохранения можно использовать бинарный формат.
+
+```{r libraries, message=FALSE, warning=FALSE}
+required_packages <- c(
+  'data.table', 'keras', 'reticulate'
+)
+if (!all(required_packages %in% installed.packages())) {
+  install.packages(setdiff(required_packages, installed.packages()))
+}
+
+library(data.table)
+library(keras)
+library(reticulate)
+
+use_python('C:/ProgramData/Anaconda3')
+```
+
+```{r data_load, message=FALSE, warning=FALSE}
+so <- fread('so.csv', encoding = 'UTF-8')
+so1 <- copy(so)
+```
+
+*Предобработка массива позаимствована из задания 3.4. Я решил попробовать обе кодирующие функции и сравнить их результаты. Судя по [статье](https://habr.com/ru/company/ods/blog/326418/#one-hot-encoding), `hashing trick` лучше подходит для переменных с неопределенным количеством значений, особенно если в новых данных встретятся новые значения: мне кажется, именно такие свойства у текстовых данных. Насколько я видел, просто щелкая обе функции, результат они дают один и тот же.*
+
+```{r data_wrangling}
+# Имена переменных для массива:
+setnames(
+  so,
+  c('user', 'usid', 'postid', 'date', 'quoter', 'text', 'url', 'id', '')
+)
+
+so[, c('') := NULL]
+str(so)
+
+set.seed(191221)
+darlana <- copy(so)[(user == 'Darlana') & (text != '')][
+  sample(.N, 1000), .(user, postid, text)]
+
+# Вариант 1: tidy-формат: 1 строка — 1 токен — 1 пост
+darlana_encoded <- copy(darlana)[
+  ,
+  .(token = unlist(lapply(text, keras::text_to_word_sequence)),
+    token_enc  = unlist(lapply(text, keras::text_one_hot, n = 10000)),
+    token_hash = unlist(lapply(text, keras::text_hashing_trick, n = 10000))),
+  by = .(user, postid)
+  ]
+
+head(darlana_encoded, 20)
+
+# Вариант 2: вложенный формат: 1 строка — 1 пост,
+# колонка token_hash — это список индексов слов
+darlana_enc <- copy(darlana)[
+  ,
+  token_hash := sapply(text, keras::text_hashing_trick, n = 10000)]
+```
+
+*У меня получились создать тензор, пригодный для тренировки нейросети, только используя первый вариант данных и только с помощью библиотеки `tidytext`:*
+
+```{r libraries_tidyverse, warning=FALSE, message=FALSE}
+required_packages <- c(
+  'dplyr', 'dtplyr', 'tidytext'
+)
+if (!all(required_packages %in% installed.packages())) {
+  install.packages(setdiff(required_packages, installed.packages()))
+}
+
+library(dplyr)
+library(dtplyr)
+library(tidytext)
+```
+
+*В результате тензор получился двухмерной матрицей, похожей на результат вызова функции `vectorize_sequences()`, но не разбитой на векторы по одному на элемент списка — пост.*
+
+```{r cast_tensor}
+darlana_matrix <- lazy_dt(darlana_encoded) %>%
+  select(postid, token_hash) %>%
+  count(postid, token_hash) %>%
+  as_tibble() %>%
+  bind_rows(
+    as_tibble(
+      expand.grid(
+        postid = unique(.$postid),
+        token_hash = setdiff(1:10000, unique(.$token_hash)),
+        n = 0L
+      )
+    )
+  ) %>%
+  cast_sparse(postid, token_hash, n)
+# Убеждаемся, что получилось 1000 постов x 10000 слов
+dim(darlana_matrix)
+
+x <- as.matrix(darlana_matrix)
+dimnames(x) <- NULL # Требование keras
+
+x[1:5, 1:5]
+
+saveRDS(x, 'darlana_tensor.rds', compress = TRUE)
+```
+
+Желательно сдать домашнее задание до 23:59 22.12.2019 г.
+
+**Задание считается выполненным, когда:**
+ * Домашняя работа сдана (1 балл)
+ * Измерения проведены корректно, описание подробное (1 балл)
+ * Код оформлен согласно рекомендациям tidyverse (1 балл)
+ * Произведено кодирование данных  (1 балла)
+ 
+
+**Дополнительные баллы:**
+* Вычисление временного периода произведено  правильно (1 балл) 
+ 
+**Минимальное количество баллов для зачета - 4**
+

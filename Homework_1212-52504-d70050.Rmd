@@ -1,0 +1,43 @@
+---
+title: "Homework_A/B testing - проблема подглядывания"
+author: "Oksana Laputskaya"
+date: '13 декабря 2019 г '
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Homework until 21.12.19
+
+* Для иллюстрации проблемы подглядывания сэмулируйте 2 биномиальных распределения, задайте произвольный уровень значимости, планируемый размер числа наблюдений и минимально обнаруживаемый эффект. 
+
+* Предполагая, что во время нашего тестирования в каждый момент времени мы получаем определенные значения для групп A и B, постройте график, иллюстрирующий проблему подглядывания. 
+
+* На графике должны быть отображены точки, когда можно обнаружить один из вариантов лучше другого, при этом планируемое число наблюдений еще не достигнуто.
+
+* Сделайте выводы.
+
+```{r libraries_load, message=FALSE, warning=FALSE}
+required_packages <- c(
+  'broom', 'dplyr', 'ggplot2'
+)
+if (!all(required_packages %in% installed.packages())) {
+  install.packages(setdiff(required_packages, installed.packages()))
+}
+
+library(broom)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r peeking_simulation}
+N <- 200 # Для обеих групп
+p <- .3  # Для обеих групп
+set.seed(191222)
+A <- sample(c(FALSE, TRUE), size = N, replace = TRUE, prob = c(1-p, p))
+B <- sample(c(FALSE, TRUE), size = N, replace = TRUE, prob = c(1-p, p))
+
+c(mean(A), mean(B))
+```
